@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes & Crediário - Loja de Variedades</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+
+        header {
+            background: linear-gradient(135deg, #111111 0%, #1f1f1f 100%);
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: #e2e8f0;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .nav-links a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 30px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #1e3a8a;
+            margin-bottom: 15px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: #059669;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #047857;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: white;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <h1>PDV - Loja de Variedades</h1>
+            <span
+                style="font-size: 0.85rem; background: #333; color: #fff; padding: 4px 10px; border-radius: 4px;">Clientes</span>
+        </div>
+        <div class="nav-links">
+            <a href="index.html">Produtos</a>
+            <a href="clientes.html">Clientes & Crediário</a>
+            <a href="caixa.html">PDV / Vendas</a>
+            <a href="abertura_caixa.html">Caixa</a>
+            <a href="relatorio.html">Relatórios</a>
+            <a href="#" onclick="sair()" style="color: #fca5a5;">Sair</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>Cadastrar Cliente de Confiança</h2>
+        <form id="formCliente" onsubmit="cadastrarCliente(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Nome Completo:</label>
+                    <input type="text" id="nome" required>
+                </div>
+                <div class="form-group">
+                    <label>Telefone / WhatsApp:</label>
+                    <input type="text" id="telefone">
+                </div>
+                <div class="form-group">
+                    <label>Limite de Crédito (R$):</label>
+                    <input type="number" id="limite_credito" step="0.01" min="0" onblur="formatarLimiteCredito(this)" required>
+                </div>
+            </div>
+            <button type="submit">Salvar Cliente</button>
+        </form>
+
+        <div
+            style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <h2>Clientes Cadastrados & Limites</h2>
+            <input type="text" id="filtroNome" placeholder="🔍 Buscar por nome ou telefone..."
+                oninput="filtrarClientes()" style="width: 320px;">
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Telefone</th>
+                    <th>Limite Total</th>
+                    <th>Devido (Fiado)</th>
+                    <th>Disponível</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaClientes"></tbody>
+        </table>
+    </div>
+
+    <!-- Modal de Extrato e WhatsApp -->
+    <div id="modalExtrato"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+        <div
+            style="background: white; padding: 25px; border-radius: 8px; width: 450px; box-shadow: 0 4px 6px rgba(0,0,0,0.15);">
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;" id="tituloExtrato">Extrato de Compras</h3>
+            <div id="conteudoExtrato"
+                style="max-height: 220px; overflow-y: auto; margin-bottom: 20px; color: #475569; font-size: 0.95rem; line-height: 1.5; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 10px 0;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" onclick="fecharModalExtrato()"
+                    style="background-color: #64748b; padding: 8px 15px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Fechar</button>
+                <button type="button" id="btnEnviarWhatsapp"
+                    style="background-color: #25d366; padding: 8px 15px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Enviar
+                    no WhatsApp</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Alerta Customizado -->
+    <div id="modalAlerta"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+        <div
+            style="background: white; padding: 25px; border-radius: 8px; width: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); text-align: center;">
+            <h3 style="color: #1e3a8a; margin-bottom: 10px;">Atenção</h3>
+            <p id="textoAlertaCustomizado"
+                style="color: #475569; margin-bottom: 20px; font-size: 1rem; line-height: 1.4;"></p>
+            <button type="button" onclick="fecharAlertaCustomizado()"
+                style="background-color: #2563eb; padding: 8px 20px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">OK</button>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+        const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+        if (usuario.cargo === 'operador') {
+
+            window.location.href = 'caixa.html'; // Redireciona para a tela de Vendas/PDV
+        }
+        const API_URL = 'http://localhost:3000';
+        let listaClientesGlobal = [];
+        let linkWhatsAppGlobal = '';
+
+        function formatarMoeda(valor) {
+            return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        async function carregarClientes() {
+            try {
+                const res = await fetch(`${API_URL}/api/clientes`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                listaClientesGlobal = await res.json();
+                renderizarClientes(listaClientesGlobal);
+            } catch (e) {
+                console.error('Erro ao carregar clientes:', e);
+            }
+        }
+
+        function renderizarClientes(clientes) {
+            const tbody = document.getElementById('tabelaClientes');
+            tbody.innerHTML = '';
+
+            if (clientes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#64748b;">Nenhum cliente encontrado.</td></tr>';
+                return;
+            }
+
+            clientes.forEach(c => {
+                const limite = Number(c.limite_credito || 0);
+                const devido = Number(c.total_devido || 0);
+                const disponivel = limite - devido;
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>#${c.id}</td>
+                        <td><b>${c.nome}</b></td>
+                        <td>${c.telefone || '-'}</td>
+                        <td>${formatarMoeda(limite)}</td>
+                        <td style="color: red;">${formatarMoeda(devido)}</td>
+                        <td style="color: green;">${formatarMoeda(disponivel)}</td>
+                        <td>
+                            <button onclick="verExtrato(${c.id}, '${c.nome}', '${c.telefone || ''}')" style="background-color: #2563eb; padding: 6px 12px; font-size: 0.85rem;">Ver Extrato</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function filtrarClientes() {
+            const termo = document.getElementById('filtroNome').value.toLowerCase();
+            const filtrados = listaClientesGlobal.filter(c =>
+                c.nome.toLowerCase().includes(termo) ||
+                (c.telefone && c.telefone.toLowerCase().includes(termo))
+            );
+            renderizarClientes(filtrados);
+        }
+
+        async function cadastrarCliente(e) {
+            e.preventDefault();
+
+            const nome = document.getElementById('nome').value;
+            const telefone = document.getElementById('telefone').value;
+            const limite_credito = parseFloat(document.getElementById('limite_credito').value);
+
+            if (telefone.length > 20) {
+                mostrarAlerta('O número de telefone é muito longo. Insira um formato válido.');
+                return;
+            }
+
+            const dados = { nome, telefone, limite_credito };
+
+            try {
+                const res = await fetch(`${API_URL}/api/clientes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(dados)
+                });
+
+                if (res.ok) {
+                    mostrarAlerta('Cliente cadastrado com sucesso!');
+                    document.getElementById('formCliente').reset();
+                    carregarClientes();
+                } else {
+                    const data = await res.json();
+                    mostrarAlerta(data.erro || 'Erro ao cadastrar cliente.');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarAlerta('Erro de conexão ao salvar o cliente.');
+            }
+        }
+
+        async function verExtrato(clienteId, clienteNome, clienteTelefone) {
+            try {
+                const res = await fetch(`${API_URL}/api/clientes/${clienteId}/crediarios`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) {
+                    mostrarAlerta('Erro ao consultar o histórico de crediário.');
+                    return;
+                }
+
+                const dividas = await res.json();
+                document.getElementById('tituloExtrato').innerText = `Extrato de: ${clienteNome}`;
+                const container = document.getElementById('conteudoExtrato');
+                container.innerHTML = '';
+
+                if (dividas.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: #64748b;">Nenhuma compra pendente (crediário) para este cliente.</p>';
+                    linkWhatsAppGlobal = '';
+                    document.getElementById('btnEnviarWhatsapp').style.display = 'none';
+                } else {
+                    let textoMensagem = `Olá, *${clienteNome}*! Tudo bem?\nPassando para enviar o extrato das suas compras em aberto conosco:\n\n`;
+                    let htmlList = '<ul style="list-style: none; padding: 0;">';
+                    let valorTotalGeral = 0;
+
+                    dividas.forEach(d => {
+                        const dataFormatada = new Date(d.criado_em).toLocaleDateString('pt-BR');
+                        const valorFormatado = Number(d.valor_total).toFixed(2);
+                        const itens = d.itens_descricao || 'Venda sem itens detalhados';
+
+                        valorTotalGeral += Number(d.valor_total);
+
+                        htmlList += `<li style="padding: 10px 0; border-bottom: 1px solid #f1f5f9;">📅 <b>${dataFormatada}</b><br>🛍️ ${itens}<br>💰 <b>R$ ${valorFormatado}</b></li>`;
+
+                        textoMensagem += `📅 *${dataFormatada}*\n🛍️ Itens: ${itens}\n💵 Valor: *R$ ${valorFormatado}*\n\n`;
+                    });
+
+                    textoMensagem += `━━━━━━━━━━━━━━━━━━━\n`;
+                    textoMensagem += `💳 *Valor Total a Pagar: R$ ${valorTotalGeral.toFixed(2)}*\n`;
+                    textoMensagem += `🔑 *Chave Pix (CPF):* 10567515923\n`;
+                    textoMensagem += `━━━━━━━━━━━━━━━━━━━\n\n`;
+                    textoMensagem += `Qualquer dúvida, estamos à disposição! Agradecemos a preferência. ✨`;
+
+                    htmlList += '</ul>';
+                    container.innerHTML = htmlList;
+
+                    let telefoneLimpo = (clienteTelefone || '').replace(/\D/g, '');
+                    if (!telefoneLimpo.startsWith('55') && telefoneLimpo.length >= 10) {
+                        telefoneLimpo = '55' + telefoneLimpo;
+                    }
+
+                    linkWhatsAppGlobal = `https://api.whatsapp.com/send?phone=${telefoneLimpo}&text=${encodeURIComponent(textoMensagem)}`;
+
+                    const btnWhats = document.getElementById('btnEnviarWhatsapp');
+                    btnWhats.style.display = 'inline-block';
+                    btnWhats.onclick = () => {
+                        if (!telefoneLimpo) {
+                            mostrarAlerta('Este cliente não possui um número de telefone válido cadastrado.');
+                            return;
+                        }
+                        window.open(linkWhatsAppGlobal, '_blank');
+                    };
+                }
+
+                document.getElementById('modalExtrato').style.display = 'flex';
+            } catch (e) {
+                console.error('Erro crítico:', e);
+                mostrarAlerta('Erro de conexão ao consultar o extrato do cliente.');
+            }
+        }
+
+        function fecharModalExtrato() {
+            document.getElementById('modalExtrato').style.display = 'none';
+        }
+
+        function sair() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('usuario');
+            window.location.href = 'login.html';
+        }
+
+      function mostrarAlerta(mensagem) {
+            const modal = document.getElementById('modalAlerta');
+            document.getElementById('textoAlertaCustomizado').innerText = mensagem;
+            modal.style.display = 'flex';
+
+            // Procura o botão OK do modal, foca nele e ativa o Enter
+            setTimeout(() => {
+                const btnOk = modal.querySelector('button');
+                if (btnOk) {
+                    btnOk.focus();
+                    const lidarComEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            btnOk.click();
+                            document.removeEventListener('keydown', lidarComEnter, true);
+                        }
+                    };
+                    document.addEventListener('keydown', lidarComEnter, true);
+                }
+            }, 50);
+        }
+
+        function fecharAlertaCustomizado() {
+            document.getElementById('modalAlerta').style.display = 'none';
+        }
+        // Adicione esta função e chame-a sempre que o seu alerta for exibido na tela:
+        function ativarEnterNoAlerta() {
+            // Dá um pequeno intervalo para garantir que o modal já foi renderizado
+            setTimeout(() => {
+                // Procura automaticamente pelo botão de OK/Confirmação dentro do modal visível
+                const btnOk = document.querySelector('.modal button, div[style*="flex"] button, button.btn-ok, .swal2-confirm');
+
+                if (btnOk) {
+                    btnOk.focus(); // Joga o foco para o botão OK
+
+                    const lidarComEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            btnOk.click(); // Simula o clique e fecha o modal
+                            document.removeEventListener('keydown', lidarComEnter);
+                        }
+                    };
+
+                    document.addEventListener('keydown', lidarComEnter);
+                }
+            }, 100);
+        }
+        function formatarLimiteCredito(input) {
+            const valor = input.value;
+            if (valor === '') {
+                input.value = '0.00';
+            } else {
+                input.value = Number(valor).toFixed(2);
+            }
+        }
+
+        ativarEnterNoAlerta();
+        carregarClientes();
+
+    </script>
+</body>
+
+</html>

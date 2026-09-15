@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtos & Estoque - Loja de Variedades</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+
+        header {
+            background: linear-gradient(135deg, #111111 0%, #1f1f1f 100%);
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: #e2e8f0;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .nav-links a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 30px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #1e3a8a;
+            margin-bottom: 15px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        input,
+        select {
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: #059669;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #047857;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: white;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <h1>PDV - Loja de Variedades</h1>
+            <span
+                style="font-size: 0.85rem; background: #333; color: #fff; padding: 4px 10px; border-radius: 4px;">Produtos</span>
+        </div>
+        <div class="nav-links">
+            <a href="index.html">Produtos</a>
+            <a href="clientes.html">Clientes & Crediário</a>
+            <a href="caixa.html">PDV / Vendas</a>
+            <a href="abertura_caixa.html">Caixa</a>
+            <a href="relatorio.html">Relatórios</a>
+            <a href="#" onclick="sair()" style="color: #fca5a5;">Sair</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>Cadastrar Novo Produto</h2>
+        <form id="formProduto" onsubmit="cadastrarProduto(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Código de Barras:</label>
+                    <input type="text" id="codigo_barras" required>
+                </div>
+                <div class="form-group">
+                    <label>Nome do Produto:</label>
+                    <input type="text" id="nome" required>
+                </div>
+                <div class="form-group">
+                    <label>Categoria:</label>
+                    <select id="categoria_id" required>
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Preço de Custo (R$):</label>
+                    <input type="number" id="preco_custo" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Preço de Venda (R$):</label>
+                    <input type="number" id="preco_venda" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Estoque Inicial:</label>
+                    <input type="number" id="estoque_atual" value="10" min="0" required>
+                </div>
+            </div>
+            <button type="submit">Salvar Produto</button>
+        </form>
+
+        <h2 style="margin-top: 40px;">Produtos Cadastrados</h2>
+        <div style="margin-bottom: 20px; margin-top: 15px;">
+            <input type="text" id="buscaTabelaProdutos" placeholder="Pesquisar produto por nome ou código de barras..."
+                oninput="filtrarTabelaProdutos(this.value)"
+                style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem;">
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Código</th>
+                    <th>Nome</th>
+                    <th>Categoria</th>
+                    <th>Preço Venda</th>
+                    <th>Estoque</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaProdutos"></tbody>
+        </table>
+    </div>
+    <script>
+        const API_URL = 'http://localhost:3000';
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+        const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+        if (usuario.cargo === 'operador') {
+            window.location.href = 'caixa.html'; // Redireciona para a tela de Vendas/PDV
+        }
+
+        let listaProdutosOriginal = [];
+        let produtoEmEdicaoId = null;
+
+        async function carregarCategorias() {
+            try {
+                const res = await fetch(`${API_URL}/categorias`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const categorias = await res.json();
+                const select = document.getElementById('categoria_id');
+                select.innerHTML = '<option value="">Selecione...</option>';
+                categorias.forEach(c => {
+                    select.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+                });
+            } catch (e) { console.error('Erro ao carregar categorias', e); }
+        }
+
+        function renderizarTabela(produtos) {
+            const tbody = document.getElementById('tabelaProdutos');
+            tbody.innerHTML = '';
+
+            if (produtos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#64748b;">Nenhum produto encontrado.</td></tr>';
+                return;
+            }
+
+            produtos.forEach(p => {
+                const corEstoque = p.estoque_atual < 0 ? 'color: #dc2626; font-weight: bold;' : '';
+
+                tbody.innerHTML += `
+                <tr>
+                    <td>#${p.id}</td>
+                    <td>${p.codigo_barras}</td>
+                    <td>${p.nome}</td>
+                    <td>${p.categoria_nome || '-'}</td>
+                    <td>R$ ${Number(p.preco_venda).toFixed(2)}</td>
+                    <td style="${corEstoque}">${p.estoque_atual}</td>
+                    <td>
+                        <button onclick="preencherEdicao(${p.id})" style="background-color: #2563eb; padding: 6px 10px; font-size: 0.85rem; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 5px;">Editar</button>
+                        <button onclick="excluirProduto(${p.id})" style="background-color: #dc2626; padding: 6px 10px; font-size: 0.85rem; color: white; border: none; border-radius: 6px; cursor: pointer;">Excluir</button>
+                    </td>
+                </tr>
+            `;
+            });
+        }
+
+        function preencherEdicao(id) {
+            const p = listaProdutosOriginal.find(item => item.id === id);
+            if (!p) return;
+
+            document.getElementById('codigo_barras').value = p.codigo_barras;
+            document.getElementById('nome').value = p.nome;
+            document.getElementById('categoria_id').value = p.categoria_id;
+            document.getElementById('preco_custo').value = p.preco_custo;
+            document.getElementById('preco_venda').value = p.preco_venda;
+            document.getElementById('estoque_atual').value = p.estoque_atual;
+
+            produtoEmEdicaoId = p.id;
+
+            const btnSubmit = document.querySelector('#formProduto button[type="submit"]');
+            btnSubmit.innerText = 'Atualizar Produto';
+            btnSubmit.style.backgroundColor = '#2563eb';
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function filtrarTabelaProdutos(termo) {
+            const termoLower = termo.toLowerCase().trim();
+            const filtrados = listaProdutosOriginal.filter(p =>
+                p.nome.toLowerCase().includes(termoLower) ||
+                p.codigo_barras.toLowerCase().includes(termoLower)
+            );
+            renderizarTabela(filtrados);
+        }
+
+        async function carregarProdutos() {
+            try {
+                const res = await fetch(`${API_URL}/produtos`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+
+                if (res.ok && Array.isArray(data)) {
+                    listaProdutosOriginal = data;
+                    renderizarTabela(listaProdutosOriginal);
+                } else {
+                    console.error('Erro retornado pela API:', data);
+                    document.getElementById('tabelaProdutos').innerHTML = '<tr><td colspan="7" style="text-align:center; color:#dc2626;">Erro ao carregar produtos do servidor.</td></tr>';
+                }
+            } catch (e) {
+                console.error('Erro de conexão:', e);
+                document.getElementById('tabelaProdutos').innerHTML = '<tr><td colspan="7" style="text-align:center; color:#dc2626;">Erro de conexão com o servidor.</td></tr>';
+            }
+        }
+
+        async function excluirProduto(id) {
+            const mensagem = 'Tem certeza que deseja excluir este produto? Esta ação não poderá ser desfeita.';
+            const confirmado = await mostrarConfirmacao(mensagem);
+            if (!confirmado) return;
+
+            try {
+                const res = await fetch(`${API_URL}/produtos/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    mostrarAlerta('Produto excluído com sucesso!');
+                    carregarProdutos();
+                } else {
+                    mostrarAlerta(data.erro || 'Erro ao excluir produto.');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarAlerta('Erro de conexão ao tentar excluir o produto.');
+            }
+        }
+
+        async function cadastrarProduto(e) {
+            e.preventDefault();
+
+            const codigo_barras = document.getElementById('codigo_barras').value.trim();
+            const precoCusto = Number(document.getElementById('preco_custo').value);
+            const precoVenda = Number(document.getElementById('preco_venda').value);
+            const estoqueVal = Number(document.getElementById('estoque_atual').value);
+
+            if (/[a-zA-Z]/.test(codigo_barras)) {
+                mostrarAlerta('O código de barras deve conter apenas números.');
+                return;
+            }
+
+            if (precoVenda < precoCusto) {
+                mostrarAlerta('O preço de venda não pode ser menor que o preço de custo!');
+                return;
+            }
+
+            if (estoqueVal < 0) {
+                mostrarAlerta('O estoque não pode ser negativo.');
+                return;
+            }
+
+            const dados = {
+                codigo_barras,
+                nome: document.getElementById('nome').value.trim(),
+                categoria_id: document.getElementById('categoria_id').value,
+                preco_custo: precoCusto,
+                preco_venda: precoVenda,
+                estoque_atual: estoqueVal
+            };
+
+            try {
+                let url = `${API_URL}/produtos`;
+                let method = 'POST';
+
+                if (produtoEmEdicaoId !== null) {
+                    url = `${API_URL}/produtos/${produtoEmEdicaoId}`;
+                    method = 'PUT';
+                }
+
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(dados)
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    mostrarAlerta(produtoEmEdicaoId ? 'Produto atualizado com sucesso!' : 'Produto cadastrado com sucesso!');
+                    document.getElementById('formProduto').reset();
+                    produtoEmEdicaoId = null;
+
+                    const btnSubmit = document.querySelector('#formProduto button[type="submit"]');
+                    btnSubmit.innerText = 'Salvar Produto';
+                    btnSubmit.style.backgroundColor = '#059669';
+
+                    carregarProdutos();
+                } else {
+                    mostrarAlerta(data.erro || 'Erro ao salvar produto.');
+                }
+            } catch (err) {
+                console.error(err);
+                mostrarAlerta('Erro de conexão ao salvar produto.');
+            }
+        }
+
+        function sair() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('usuario');
+            window.location.href = 'login.html';
+        }
+
+        function mostrarConfirmacao(mensagem) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('modalConfirmacao');
+                document.getElementById('textoConfirmacaoCustomizado').innerText = mensagem;
+                modal.style.display = 'flex';
+
+                const btnSim = document.getElementById('btnSimConfirmar');
+                const btnNao = document.getElementById('btnNaoConfirmar');
+
+                const limparEFechar = (resultado) => {
+                    modal.style.display = 'none';
+                    btnSim.replaceWith(btnSim.cloneNode(true));
+                    btnNao.replaceWith(btnNao.cloneNode(true));
+                    resolve(resultado);
+                };
+
+                document.getElementById('btnSimConfirmar').addEventListener('click', () => limparEFechar(true));
+                document.getElementById('btnNaoConfirmar').addEventListener('click', () => limparEFechar(false));
+            });
+        }
+
+        async function confirmarExclusao(id) {
+            const mensagem = 'Tem certeza que deseja excluir este produto? Esta ação não poderá ser desfeita.';
+            const resultado = await mostrarConfirmacao(mensagem);
+            if (resultado) {
+                await excluirProduto(id);
+            }
+        }
+        ativarEnterNoAlerta();
+        ativarEnterNoConfirmacao();
+
+        function ativarEnterNoConfirmacao() {
+            setTimeout(() => {
+                const btnSim = document.getElementById('btnSimConfirmar');
+                const btnNao = document.getElementById('btnNaoConfirmar');
+                if (btnSim && btnNao) {
+                    btnSim.focus();
+                    const lidarComEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            btnSim.click();
+                            document.removeEventListener('keydown', lidarComEnter, true);
+                        }
+                    };
+                    document.addEventListener('keydown', lidarComEnter, true);
+                }
+            }, 100);
+        }
+
+        function mostrarAlerta(mensagem) {
+            const modal = document.getElementById('modalAlerta');
+            document.getElementById('textoAlertaCustomizado').innerText = mensagem;
+            modal.style.display = 'flex';
+
+            setTimeout(() => {
+                const btnOk = modal.querySelector('button');
+                if (btnOk) {
+                    btnOk.focus();
+                    const lidarComEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            btnOk.click();
+                            document.removeEventListener('keydown', lidarComEnter, true);
+                        }
+                    };
+                    document.addEventListener('keydown', lidarComEnter, true);
+                }
+            }, 50);
+        }
+
+        function fecharAlertaCustomizado() {
+            document.getElementById('modalAlerta').style.display = 'none';
+        }
+
+        function ativarEnterNoAlerta() {
+            setTimeout(() => {
+                const btnOk = document.querySelector('.modal button, div[style*="flex"] button, button.btn-ok, .swal2-confirm');
+
+                if (btnOk) {
+                    btnOk.focus();
+
+                    const lidarComEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            btnOk.click();
+                            document.removeEventListener('keydown', lidarComEnter);
+                        }
+                    };
+
+                    document.addEventListener('keydown', lidarComEnter);
+                }
+            }, 100);
+        }
+
+        carregarCategorias();
+        carregarProdutos();
+    </script>
+</body>
+<div id="modalConfirmacao"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); justify-content: center; align-items: center; z-index: 9999;">
+    <div
+        style="background: white; padding: 25px; border-radius: 8px; width: 380px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="color: #1e3a8a; margin-bottom: 10px;">Confirmação</h3>
+        <p id="textoConfirmacaoCustomizado" style="color: #475569; margin-bottom: 20px; font-size: 0.95rem;"></p>
+        <div style="display: flex; justify-content: center; gap: 10px;">
+            <button id="btnNaoConfirmar"
+                style="background: #64748b; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Cancelar</button>
+            <button id="btnSimConfirmar"
+                style="background: #2563eb; color: white; border: none; padding: 8px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">OK</button>
+        </div>
+    </div>
+</div>
+<!-- Modal de Alerta Customizado -->
+<div id="modalAlerta"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div
+        style="background: white; padding: 25px; border-radius: 8px; width: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); text-align: center;">
+        <h3 style="color: #1e3a8a; margin-bottom: 10px;">Atenção</h3>
+        <p id="textoAlertaCustomizado" style="color: #475569; margin-bottom: 20px; font-size: 1rem; line-height: 1.4;">
+        </p>
+        <button type="button" onclick="fecharAlertaCustomizado()"
+            style="background-color: #2563eb; padding: 8px 20px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">OK</button>
+    </div>
+</div>
+
+</html>

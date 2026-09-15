@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatórios - Loja de Variedades</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+
+        header {
+            background: linear-gradient(135deg, #111111 0%, #1f1f1f 100%);
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: #e2e8f0;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .nav-links a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 30px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Sub-menu de Abas */
+        .submenu-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: #e2e8f0;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #475569;
+            font-size: 0.9rem;
+        }
+
+        .tab-btn.active {
+            background: #1e3a8a;
+            color: white;
+        }
+
+        .relatorio-section {
+            display: none;
+        }
+
+        .relatorio-section.active {
+            display: block;
+        }
+
+        h2 {
+            color: #1e3a8a;
+            margin-bottom: 15px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        input,
+        select {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .btn-filter {
+            background-color: #059669;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-filter:hover {
+            background-color: #047857;
+        }
+
+        .btn-whats {
+            background-color: #25d366;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-whats:hover {
+            background-color: #22c55e;
+        }
+
+        .badges-pagamento {
+            display: flex;
+            gap: 6px;
+            margin-left: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge-pag {
+            background: #e2e8f0;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #475569;
+        }
+
+        .badge-pag.active {
+            background: #1e3a8a;
+            color: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: white;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+        }
+
+        @media print {
+
+            header,
+            .submenu-tabs,
+            .filter-bar,
+            button {
+                display: none !important;
+            }
+
+            body {
+                background-color: white;
+            }
+
+            .container {
+                box-shadow: none;
+                margin: 0;
+                padding: 0;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <h1>PDV - Loja de Variedades</h1>
+            <span
+                style="font-size: 0.85rem; background: #333; color: #fff; padding: 4px 10px; border-radius: 4px;">Relatórios</span>
+        </div>
+        <div class="nav-links">
+            <a href="index.html">Produtos</a>
+            <a href="clientes.html">Clientes & Crediário</a>
+            <a href="caixa.html">PDV / Vendas</a>
+            <a href="abertura_caixa.html">Caixa</a>
+            <a href="relatorio.html">Relatórios</a>
+            <a href="#" onclick="sair()" style="color: #fca5a5;">Sair</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Sub-menu Interno com Abas -->
+        <div class="submenu-tabs">
+            <button class="tab-btn active" onclick="trocarAba('vendas', this)">Relatório de Vendas</button>
+            <button class="tab-btn" onclick="trocarAba('caixas', this)">Conferência de Caixas</button>
+            <button class="tab-btn" onclick="trocarAba('estoque', this)">Estoque Baixo</button>
+            <button class="tab-btn" onclick="trocarAba('maisVendidos', this)">Mais Vendidos</button>
+            <button class="tab-btn" onclick="trocarAba('compras', this)"
+                style="background-color: #f59e0b; color: white;">Sugestão de Compras</button>
+        </div>
+
+        <!-- Seção 1: Vendas -->
+        <div id="secaoVendas" class="relatorio-section active">
+            <h2>Histórico de Vendas</h2>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+                <div
+                    style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #059669; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <h4 id="rotuloTotalDia" style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Total Hoje
+                        (Dia)</h4>
+                    <p id="totalDia" style="font-size: 1.25rem; font-weight: bold; color: #059669;">R$ 0,00</p>
+                </div>
+                <div
+                    style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <h4 style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Total da Semana</h4>
+                    <p id="totalSemana" style="font-size: 1.25rem; font-weight: bold; color: #2563eb;">R$ 0,00</p>
+                </div>
+                <div
+                    style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #7c3aed; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <h4 style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Total do Mês</h4>
+                    <p id="totalMes" style="font-size: 1.25rem; font-weight: bold; color: #7c3aed;">R$ 0,00</p>
+                </div>
+            </div>
+            <div class="filter-bar">
+                <label>Data:</label>
+                <input type="date" id="filtroData">
+                <button class="btn-filter" onclick="renderizarTabelaVendas()">Filtrar Data</button>
+                <button class="badge-pag" style="background:#64748b; color:white;" onclick="limparFiltroData()">Limpar
+                    Data</button>
+                <button class="btn-filter" style="background-color: #dc2626;" onclick="exportarPDF()">📥 Baixar
+                    PDF</button>
+                <button class="btn-whats" onclick="enviarRelatorioWhatsApp()">📲 Enviar no WhatsApp</button>
+
+                <div class="badges-pagamento">
+                    <button class="badge-pag active" onclick="filtrarPagamento('todos', this)">Todos</button>
+                    <button class="badge-pag" onclick="filtrarPagamento('dinheiro', this)">Dinheiro</button>
+                    <button class="badge-pag" onclick="filtrarPagamento('pix', this)">Pix</button>
+                    <button class="badge-pag" onclick="filtrarPagamento('cartao_credito', this)">Crédito</button>
+                    <button class="badge-pag" onclick="filtrarPagamento('cartao_debito', this)">Débito</button>
+                    <button class="badge-pag" onclick="filtrarPagamento('crediario', this)">Crediário</button>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Data</th>
+                        <th>Cliente</th>
+                        <th>Pagamento</th>
+                        <th>Total (R$)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaVendasRelatorio"></tbody>
+            </table>
+            <div id="totalVendasFiltradas"
+                style="display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 15px; padding: 14px 12px; border-top: 2px solid #1e3a8a; background: #eff6ff; color: #1e3a8a; font-weight: bold;">
+                <span id="rotuloTotalVendasFiltradas">Total das vendas exibidas:</span>
+                <span id="valorTotalVendasFiltradas">R$ 0,00</span>
+            </div>
+        </div>
+
+        <!-- Seção 2: Caixas -->
+        <div id="secaoCaixas" class="relatorio-section">
+            <h2>Conferência de Aberturas e Fechamentos de Caixa</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID Sessão</th>
+                        <th>Operador</th>
+                        <th>Abertura</th>
+                        <th>Fechamento</th>
+                        <th>Total Vendas</th>
+                        <th>Esperado</th>
+                        <th>Situação</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaCaixasRelatorio"></tbody>
+            </table>
+        </div>
+
+        <!-- Seção 3: Estoque Baixo -->
+        <div id="secaoEstoque" class="relatorio-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Produtos com Estoque Crítico (Abaixo ou igual ao Mínimo)</h2>
+                <button type="button" class="btn-whats" onclick="enviarAlertaEstoqueWhatsApp()">📲 Pedir Reposição no
+                    WhatsApp</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Nome do Produto</th>
+                        <th>Categoria</th>
+                        <th>Estoque Atual</th>
+                        <th>Estoque Mínimo</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaEstoqueBaixo"></tbody>
+            </table>
+        </div>
+
+        <!-- Seção 4: Mais Vendidos -->
+        <div id="secaoMaisVendidos" class="relatorio-section">
+            <h2>Ranking de Produtos Mais Vendidos</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Posição</th>
+                        <th>Código</th>
+                        <th>Produto</th>
+                        <th>Qtd. Vendida</th>
+                        <th>Faturamento Total</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaMaisVendidos"></tbody>
+            </table>
+        </div>
+        <!-- Seção 5: Sugestão de Compras -->
+        <div id="secaoCompras" class="relatorio-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Sugestão Inteligente de Compras</h2>
+                <button type="button" class="btn-whats" onclick="enviarListaComprasWhatsApp()">📲 Enviar Lista no
+                    WhatsApp</button>
+            </div>
+            <p style="color: #64748b; margin-bottom: 15px;">O sistema cruza produtos com estoque baixo e histórico de
+                mais vendidos para sugerir a reposição ideal.</p>
+            <div
+                style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #cbd5e1; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="text" id="manualNome" placeholder="Ex: Item novo pedido por cliente / Tendência..."
+                    style="flex: 2; min-width: 220px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                <input type="number" id="manualQtd" placeholder="Qtd" value="1" min="1"
+                    style="width: 80px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                <select id="manualMotivo"
+                    style="padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: white;">
+                    <option value="📝 Pedido de Cliente">📝 Pedido de Cliente</option>
+                    <option value="🔥 Tendência de Mercado">🔥 Tendência de Mercado</option>
+                    <option value="💡 Item Extra / Outros">💡 Item Extra</option>
+                </select>
+                <button type="button" class="btn-filter" onclick="adicionarItemManual()">➕ Adicionar Item</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Produto</th>
+                        <th>Estoque Atual</th>
+                        <th>Motivo</th>
+                        <th>Sugestão de Compra</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaSugestaoCompras"></tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+        const API_URL = 'http://localhost:3000';
+        let vendasGlobal = [];
+        let produtosEstoqueBaixoGlobal = [];
+        let pagamentoAtual = 'todos';
+        let sugestoesGlobais = [];
+        let itensOcultados = JSON.parse(localStorage.getItem('itensOcultadosPDV')) || [];
+
+        function ocultarItemTemporariamente(codigoBarras) {
+            const expiraEm = new Date().getTime() + (7 * 24 * 60 * 60 * 1000); // 7 dias
+            itensOcultados.push({ codigo: codigoBarras, expira: expiraEm });
+            localStorage.setItem('itensOcultadosPDV', JSON.stringify(itensOcultados));
+
+            gerarSugestaoCompras(produtosEstoqueBaixoGlobal, window.maisVendidosCache || []);
+        }
+
+        function formatarMoeda(valor) {
+            return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+            if (usuario.cargo === 'operador') {
+                // Esconde os links do menu superior de Produtos e Clientes
+                document.querySelectorAll('.nav-links a').forEach(a => {
+                    if (a.href.includes('index.html') || a.href.includes('clientes.html')) {
+                        a.style.display = 'none';
+                    }
+                });
+
+                // Esconde abas restritas
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    if (btn.innerText.includes('Vendas') || btn.innerText.includes('Caixas') || btn.innerText.includes('Mais Vendidos')) {
+                        btn.style.display = 'none';
+                    }
+                });
+
+                trocarAba('estoque', document.querySelector('.tab-btn:nth-child(5)')); // Foca na aba de compras/estoque
+            }            // Não preenchemos a data automaticamente no carregamento para exibir todas as vendas de início
+            await carregarTodosRelatorios();
+        });
+
+        function trocarAba(aba, elemento) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.relatorio-section').forEach(s => s.classList.remove('active'));
+
+            elemento.classList.add('active');
+            if (aba === 'vendas') document.getElementById('secaoVendas').classList.add('active');
+            else if (aba === 'caixas') document.getElementById('secaoCaixas').classList.add('active');
+            else if (aba === 'estoque') document.getElementById('secaoEstoque').classList.add('active');
+            else if (aba === 'maisVendidos') document.getElementById('secaoMaisVendidos').classList.add('active');
+            else if (aba === 'compras') document.getElementById('secaoCompras').classList.add('active');
+        }
+
+        function calcularTotaisResumo(vendas) {
+            let totalDia = 0;
+            let totalSemana = 0;
+            let totalMes = 0;
+
+            const agora = new Date();
+            const ano = agora.getFullYear();
+            const mes = String(agora.getMonth() + 1).padStart(2, '0');
+            const dia = String(agora.getDate()).padStart(2, '0');
+            const hojeStr = `${ano}-${mes}-${dia}`;
+            const mesAtual = agora.getMonth();
+            const anoAtual = agora.getFullYear();
+
+            vendas.forEach(v => {
+                if (!v.criado_em) return;
+                const valor = Number(v.valor_total) || 0;
+                const dataStr = v.criado_em.substring(0, 10);
+
+                // Total do Dia (Hoje)
+                if (dataStr === hojeStr) {
+                    totalDia += valor;
+                }
+
+                const dataVendaObj = new Date(v.criado_em);
+                if (!isNaN(dataVendaObj)) {
+                    // Total do Mês Atual
+                    if (dataVendaObj.getMonth() === mesAtual && dataVendaObj.getFullYear() === anoAtual) {
+                        totalMes += valor;
+                    }
+
+                    // Total da Semana (últimos 7 dias)
+                    const diffTime = agora - dataVendaObj;
+                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                    if (diffDays >= 0 && diffDays <= 7) {
+                        totalSemana += valor;
+                    }
+                }
+            });
+
+            document.getElementById('totalDia').innerText = formatarMoeda(totalDia);
+            document.getElementById('totalSemana').innerText = formatarMoeda(totalSemana);
+            document.getElementById('totalMes').innerText = formatarMoeda(totalMes);
+        }
+
+        async function carregarTodosRelatorios() {
+            // 1. Carregar Vendas
+            try {
+                const resVendas = await fetch(`${API_URL}/vendas`);
+                const dadosVendas = await resVendas.json();
+                vendasGlobal = dadosVendas.vendas;
+                calcularTotaisResumo(vendasGlobal);
+                renderizarTabelaVendas();
+            } catch (error) {
+                console.error('Erro ao carregar relatório de vendas:', error);
+            }
+
+            // 2. Carregar Caixas
+            try {
+                const resCaixas = await fetch(`${API_URL}/relatorios/caixas`);
+                const caixas = await resCaixas.json();
+                const tbodyCaixas = document.getElementById('tabelaCaixasRelatorio');
+                tbodyCaixas.innerHTML = caixas.length === 0 ? '<tr><td colspan="7" style="text-align:center; color:#64748b;">Nenhum caixa registrado.</td></tr>' : '';
+                caixas.forEach(c => {
+                    let corSituacao = '#1e3a8a';
+                    if (c.situacao_caixa.includes('Sobra')) corSituacao = '#059669';
+                    if (c.situacao_caixa.includes('Falta')) corSituacao = '#dc2626';
+
+                    tbodyCaixas.innerHTML += `
+                        <tr>
+                            <td>#${c.sessao_id}</td>
+                            <td>${c.operador}</td>
+                            <td>${formatarMoeda(c.valor_abertura)}</td>
+                            <td>${c.valor_fechamento !== null ? formatarMoeda(c.valor_fechamento) : 'Aberto'}</td>
+                            <td>${formatarMoeda(c.total_vendas)}</td>
+                            <td>${formatarMoeda(c.valor_esperado)}</td>
+                            <td style="color: ${corSituacao}; font-weight: bold;">${c.situacao_caixa}</td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error('Erro ao carregar relatório de caixas:', error);
+            }
+
+            // 3. Carregar Estoque Baixo
+            try {
+                const resEstoque = await fetch(`${API_URL}/relatorios/estoque-baixo`);
+                produtosEstoqueBaixoGlobal = await resEstoque.json();
+                const tbodyEstoque = document.getElementById('tabelaEstoqueBaixo');
+                tbodyEstoque.innerHTML = produtosEstoqueBaixoGlobal.length === 0 ? '<tr><td colspan="5" style="text-align:center; color:#64748b;">Nenhum produto com estoque crítico.</td></tr>' : '';
+                produtosEstoqueBaixoGlobal.forEach(p => {
+                    tbodyEstoque.innerHTML += `
+                        <tr>
+                            <td>${p.codigo_barras}</td>
+                            <td><b>${p.nome}</b></td>
+                            <td>${p.categoria_nome || '-'}</td>
+                            <td style="color: #dc2626; font-weight: bold;">${p.estoque_atual}</td>
+                            <td>${p.estoque_minimo}</td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error('Erro ao carregar estoque baixo:', error);
+            }
+
+            // 4. Carregar Mais Vendidos
+            try {
+                const resVendidos = await fetch(`${API_URL}/relatorios/mais-vendidos`);
+                const maisVendidos = await resVendidos.json();
+                const tbodyVendidos = document.getElementById('tabelaMaisVendidos');
+                tbodyVendidos.innerHTML = maisVendidos.length === 0 ? '<tr><td colspan="5" style="text-align:center; color:#64748b;">Nenhuma venda registrada para o ranking.</td></tr>' : '';
+                maisVendidos.forEach((p, index) => {
+                    tbodyVendidos.innerHTML += `
+                        <tr>
+                            <td><b>#${index + 1}</b></td>
+                            <td>${p.codigo_barras}</td>
+                            <td>${p.nome}</td>
+                            <td><b>${p.total_vendido}</b> un.</td>
+                            <td style="color: #059669; font-weight: bold;">${formatarMoeda(p.faturamento_total)}</td>
+                        </tr>
+                    `;
+                });
+
+                // 5. Gerar Sugestão de Compras
+                gerarSugestaoCompras(produtosEstoqueBaixoGlobal, maisVendidos);
+            } catch (error) {
+                console.error('Erro ao carregar mais vendidos:', error);
+            }
+        }
+
+        function enviarAlertaEstoqueWhatsApp() {
+            if (produtosEstoqueBaixoGlobal.length === 0) {
+                alert('Não há produtos com estoque crítico no momento para envio.');
+                return;
+            }
+
+            let msg = `🚨 *ALERTA DE REPOSIÇÃO DE ESTOQUE* 🚨\nOlá! Os seguintes produtos atingiram o estoque crítico e precisam ser repostos com urgência:\n\n`;
+
+            produtosEstoqueBaixoGlobal.forEach(p => {
+                msg += `📦 *${p.nome}*\n   - Código: ${p.codigo_barras}\n   - Estoque Atual: *${p.estoque_atual}* (Mínimo: ${p.estoque_minimo})\n\n`;
+            });
+
+            msg += `Por favor, providenciar a compra dos itens solicitados. Obrigado! ✨`;
+
+            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+            window.open(url, '_blank');
+        }
+
+        function filtrarPagamento(tipo, elemento) {
+            pagamentoAtual = tipo;
+            document.querySelectorAll('.badges-pagamento .badge-pag').forEach(b => b.classList.remove('active'));
+            elemento.classList.add('active');
+            renderizarTabelaVendas();
+        }
+
+        function limparFiltroData() {
+            document.getElementById('filtroData').value = '';
+            renderizarTabelaVendas();
+        }
+
+        function renderizarTabelaVendas() {
+            const dataFiltro = document.getElementById('filtroData').value;
+            const tbody = document.getElementById('tabelaVendasRelatorio');
+            tbody.innerHTML = '';
+
+            document.getElementById('rotuloTotalVendasFiltradas').innerText = dataFiltro
+                ? 'Total do dia selecionado:'
+                : 'Total das vendas exibidas:';
+
+            document.getElementById('rotuloTotalDia').innerText = dataFiltro
+                ? 'Total do Dia Selecionado'
+                : 'Total Hoje (Dia)';
+
+            let filtradas = vendasGlobal.filter(v => {
+                let matchPag = (pagamentoAtual === 'todos' || v.forma_pagamento === pagamentoAtual);
+                let matchData = true;
+                if (dataFiltro && v.criado_em) {
+                    const dataVendaStr = v.criado_em.substring(0, 10);
+                    matchData = (dataVendaStr === dataFiltro);
+                }
+                return matchPag && matchData;
+            });
+
+            const totalFiltrado = filtradas.reduce((total, venda) => total + (Number(venda.valor_total) || 0), 0);
+            document.getElementById('valorTotalVendasFiltradas').innerText = formatarMoeda(totalFiltrado);
+
+            if (dataFiltro) {
+                document.getElementById('totalDia').innerText = formatarMoeda(totalFiltrado);
+            } else {
+                calcularTotaisResumo(vendasGlobal);
+            }
+
+            if (filtradas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">Nenhuma venda encontrada para os filtros selecionados.</td></tr>';
+                return;
+            }
+
+            filtradas.forEach(v => {
+                const dataFormatada = v.criado_em ? new Date(v.criado_em).toLocaleString('pt-BR') : '-';
+                tbody.innerHTML += `
+                    <tr>
+                        <td>#${v.id}</td>
+                        <td>${dataFormatada}</td>
+                        <td>${v.cliente_nome || 'Cliente Avulso'}</td>
+                        <td style="text-transform: capitalize;">${v.forma_pagamento.replace('_', ' ')}</td>
+                        <td><b>${formatarMoeda(v.valor_total)}</b></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function sair() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('usuario');
+            window.location.href = 'login.html';
+        }
+        function exportarPDF() {
+            window.print();
+        }
+
+        function enviarRelatorioWhatsApp() {
+            const totalDia = document.getElementById('totalDia').innerText;
+            const totalSemana = document.getElementById('totalSemana').innerText;
+            const totalMes = document.getElementById('totalMes').innerText;
+            const dataFiltro = document.getElementById('filtroData').value;
+            let rotuloTotalDia = 'Total Hoje (Dia)';
+
+            if (dataFiltro) {
+                const [ano, mes, dia] = dataFiltro.split('-');
+                rotuloTotalDia = `Total do Dia (${dia}/${mes}/${ano})`;
+            }
+
+            let msg = `📊 *RESUMO DO RELATÓRIO DE VENDAS* 📊\n\n`;
+            msg += `• *${rotuloTotalDia}:* ${totalDia}\n`;
+            msg += `• *Total da Semana:* ${totalSemana}\n`;
+            msg += `• *Total do Mês:* ${totalMes}\n\n`;
+            msg += `_Loja de Variedades - PDV_ ✨`;
+
+            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+            window.open(url, '_blank');
+        }
+        let itensManuaisCompras = JSON.parse(localStorage.getItem('itensManuaisPDV')) || [];
+
+        function adicionarItemManual() {
+            const nomeInput = document.getElementById('manualNome');
+            const qtdInput = document.getElementById('manualQtd');
+            const motivoSelect = document.getElementById('manualMotivo');
+
+            const nome = nomeInput.value.trim();
+            const qtd = Number(qtdInput.value) || 1;
+            const motivo = motivoSelect.value;
+
+            if (!nome) {
+                alert('Digite o nome do produto desejado.');
+                return;
+            }
+
+            itensManuaisCompras.push({ nome, qtd, motivo });
+            localStorage.setItem('itensManuaisPDV', JSON.stringify(itensManuaisCompras));
+
+            nomeInput.value = '';
+            qtdInput.value = '1';
+
+            gerarSugestaoCompras(produtosEstoqueBaixoGlobal, window.maisVendidosCache || []);
+        }
+
+        function removerItemManual(index) {
+            itensManuaisCompras.splice(index, 1);
+            localStorage.setItem('itensManuaisPDV', JSON.stringify(itensManuaisCompras));
+            gerarSugestaoCompras(produtosEstoqueBaixoGlobal, window.maisVendidosCache || []);
+        }
+
+        function gerarSugestaoCompras(estoqueBaixo, maisVendidos) {
+            window.maisVendidosCache = maisVendidos;
+            const tbody = document.getElementById('tabelaSugestaoCompras');
+            tbody.innerHTML = '';
+            sugestoesGlobais = [];
+
+            const topSellersMap = {};
+            if (maisVendidos) {
+                maisVendidos.forEach(p => { topSellersMap[p.id] = true; });
+            }
+
+            // 1. Renderizar Itens Manuais / Pedidos de Clientes / Tendências (Sempre visível)
+            itensManuaisCompras.forEach((item, index) => {
+                sugestoesGlobais.push({ nome: item.nome, qtd: item.qtd });
+                tbody.innerHTML += `
+                    <tr style="background: #fdf4ff;">
+                        <td>Manual</td>
+                        <td><b>${item.nome}</b></td>
+                        <td>-</td>
+                        <td style="color: #9333ea; font-weight: bold;">${item.motivo}</td>
+                        <td style="display: flex; justify-content: space-between; align-items: center; border: none; padding-top: 15px;">
+                            <span style="color: #059669; font-weight: bold;">Comprar ${item.qtd} un.</span>
+                            <button onclick="removerItemManual(${index})" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Remover</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // 2. Renderizar Sugestões Automáticas Apenas para Administradores
+            const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+            if (usuario.cargo !== 'operador') {
+                estoqueBaixo.forEach(p => {
+                    const isTopSeller = topSellersMap[p.id];
+                    const multiplicador = isTopSeller ? 3 : 2;
+                    let sugestaoQtd = (p.estoque_minimo * multiplicador) - p.estoque_atual;
+                    if (sugestaoQtd < 1) sugestaoQtd = p.estoque_minimo || 5;
+
+                    const motivo = isTopSeller ? '🔥 Alta Saída + Baixo Estoque' : '⚠️ Abaixo do Mínimo';
+                    const corMotivo = isTopSeller ? '#ea580c' : '#dc2626';
+
+                    sugestoesGlobais.push({ nome: p.nome, qtd: sugestaoQtd });
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${p.codigo_barras}</td>
+                            <td><b>${p.nome}</b></td>
+                            <td>${p.estoque_atual} un.</td>
+                            <td style="color: ${corMotivo}; font-weight: bold;">${motivo}</td>
+                            <td style="color: #059669; font-weight: bold;">Comprar ${sugestaoQtd} un.</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            if (tbody.innerHTML === '') {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">Nenhuma sugestão ou pedido manual registrado.</td></tr>';
+            }
+        }
+        function enviarListaComprasWhatsApp() {
+            if (sugestoesGlobais.length === 0) {
+                alert('Não há itens na lista de compras no momento.');
+                return;
+            }
+
+            let msg = `🛒 *LISTA DE COMPRAS E PEDIDOS* 🛒\n_Inclui estoque crítico e tendências/clientes_\n\n`;
+            sugestoesGlobais.forEach(s => {
+                msg += `• ${s.nome} ➔ *Comprar ${s.qtd} un.*\n`;
+            });
+
+            const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+            window.open(url, '_blank');
+        }
+        // Adicione esta função e chame-a sempre que o seu alerta for exibido na tela:
+        function mostrarAlerta(mensagem) {
+            const modal = document.getElementById('modalAlerta');
+            document.getElementById('textoAlertaCustomizado').innerText = mensagem;
+            modal.style.display = 'flex';
+
+            // Procura o botão OK do modal, foca nele e ativa o Enter
+            setTimeout(() => {
+                const btnOk = modal.querySelector('button');
+                if (btnOk) {
+                    btnOk.focus();
+                    const lidarComEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            btnOk.click();
+                            document.removeEventListener('keydown', lidarComEnter, true);
+                        }
+                    };
+                    document.addEventListener('keydown', lidarComEnter, true);
+                }
+            }, 50);
+        }
+    </script>
+</body>
+
+</html>

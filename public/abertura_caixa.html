@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Caixa - PDV</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+
+        header {
+            background: linear-gradient(135deg, #111111 0%, #1f1f1f 100%);
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: #e2e8f0;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .nav-links a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #1e3a8a;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            color: white;
+        }
+
+        .btn-success {
+            background-color: #059669;
+        }
+
+        .btn-success:hover {
+            background-color: #047857;
+        }
+
+        .btn-danger {
+            background-color: #dc2626;
+        }
+
+        .btn-danger:hover {
+            background-color: #b91c1c;
+        }
+
+        .links-uteis {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+
+        .links-uteis a {
+            color: #1e3a8a;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .links-uteis a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <h1>PDV - Loja de Variedades</h1>
+            <span
+                style="font-size: 0.85rem; background: #333; color: #fff; padding: 4px 10px; border-radius: 4px;">Caixa</span>
+        </div>
+        <div class="nav-links">
+            <a href="index.html">Produtos</a>
+            <a href="clientes.html">Clientes & Crediário</a>
+            <a href="caixa.html">PDV / Vendas</a>
+            <a href="abertura_caixa.html">Caixa</a>
+            <a href="relatorio.html">Relatórios</a>
+            <a href="#" onclick="sair()" style="color: #fca5a5;">Sair</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>Gerenciamento de Caixa</h2>
+        <div id="conteudoCaixa">
+            <p style="text-align: center; color: #64748b;">Verificando status do caixa...</p>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+        const API_URL = 'http://localhost:3000';
+        let sessaoAtual = null;
+
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+            if (usuario.cargo === 'operador') {
+                document.querySelectorAll('.nav-links a').forEach(a => {
+                    const href = a.getAttribute('href') || '';
+                    if (href.includes('index.html') || href.includes('clientes.html')) {
+                        a.style.display = 'none';
+                    }
+                });
+            }
+
+            // Se a página tiver verificação de caixa ou carregamentos específicos, chamam aqui:
+            if (typeof verificarStatusCaixa === 'function') {
+                await verificarStatusCaixa();
+            }
+        });
+        async function verificarStatusCaixa() {
+            const container = document.getElementById('conteudoCaixa');
+            try {
+                const res = await fetch(`${API_URL}/sessoes/ativa`);
+                const data = await res.json();
+
+                if (!data.aberta) {
+                    // Caixa Fechado - Exibir formulário de abertura
+                    container.innerHTML = `
+                        <form onsubmit="abrirCaixa(event)">
+                            <div class="form-group">
+                                <label>Valor Inicial em Dinheiro no Caixa (Troco):</label>
+                                <input type="number" id="valor_abertura" step="0.01" placeholder="0.00" required>
+                            </div>
+                            <button type="submit" class="btn btn-success">Abrir Caixa</button>
+                        </form>
+                        <div class="links-uteis">
+                            <a href="caixa.html">→ Ir para Frente de Caixa (PDV)</a>
+                            <a href="index.html">→ Voltar para o Estoque</a>
+                        </div>
+                    `;
+                } else {
+                    // Caixa Aberto - Exibir opção de fechamento
+                    sessaoAtual = data.sessao;
+                    container.innerHTML = `
+                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 6px; margin-bottom: 20px; color: #166534; font-weight: 600; text-align: center;">
+                            Caixa está ABERTO (Sessão #${sessaoAtual.id})
+                        </div>
+                        <form onsubmit="fecharCaixa(event)">
+                            <div class="form-group">
+                                <label>Valor Total Apurado no Fechamento (R$):</label>
+                                <input type="number" id="valor_fechamento" step="0.01" placeholder="0.00" required>
+                            </div>
+                            <button type="submit" class="btn btn-danger">Fechar Caixa</button>
+                        </form>
+                        <div class="links-uteis">
+                            <a href="caixa.html">→ Ir para Frente de Caixa (PDV)</a>
+                            <a href="index.html">→ Voltar para o Estoque</a>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao verificar caixa:', error);
+                container.innerHTML = `<p style="color: #dc2626; text-align: center;">Erro de conexão com o servidor ao verificar o caixa.</p>`;
+            }
+        }
+
+        async function abrirCaixa(e) {
+            e.preventDefault();
+            const usuarioLogado = JSON.parse(localStorage.getItem('usuario')) || JSON.parse(localStorage.getItem('usuarioLogado'));
+            const valor_abertura = document.getElementById('valor_abertura').value;
+
+            try {
+                const res = await fetch(`${API_URL}/sessoes/abrir`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        usuario_id: usuarioLogado ? usuarioLogado.id : null,
+                        valor_abertura: valor_abertura
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    mostrarAlerta('Caixa aberto com sucesso!');
+                } else {
+                    mostrarAlerta(data.error || data.erro || 'Erro ao processar a operação.');
+                }
+            } catch (error) {
+                console.error(error);
+                mostrarAlerta('Erro de conexão com o servidor.');
+            }
+        }
+        async function fecharCaixa(e) {
+            e.preventDefault();
+            const valor_fechamento = document.getElementById('valor_fechamento').value;
+
+            try {
+                const res = await fetch(`${API_URL}/sessoes/fechar/${sessaoAtual.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ valor_fechamento })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    mostrarAlerta('Caixa fechado com sucesso!');
+                    verificarStatusCaixa();
+                } else {
+                    mostrarAlerta(data.error || 'Erro ao fechar caixa.');
+                }
+            } catch (err) {
+                console.error(err);
+                mostrarAlerta('Erro de conexão ao fechar o caixa.');
+            }
+        }
+
+        function sair() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('usuarioLogado');
+            window.location.href = 'login.html';
+        }
+        function mostrarAlerta(mensagem) {
+            let modal = document.getElementById('modalAlerta');
+            if (!modal) {
+                const modalHtml = `
+                <div id="modalAlerta" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+                    <div style="background: white; padding: 25px; border-radius: 8px; width: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); text-align: center;">
+                        <h3 style="color: #1e3a8a; margin-bottom: 10px;">Atenção</h3>
+                        <p id="textoAlertaCustomizado" style="color: #475569; margin-bottom: 20px; font-size: 1rem; line-height: 1.4;"></p>
+                        <button type="button" id="btnOkAlerta" onclick="fecharAlertaCustomizado()" style="background-color: #2563eb; padding: 8px 20px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">OK</button>
+                    </div>
+                </div>`;
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                modal = document.getElementById('modalAlerta');
+            }
+            document.getElementById('textoAlertaCustomizado').innerText = mensagem;
+            modal.style.display = 'flex';
+
+            // Foca no botão OK e intercepta o Enter
+            const btnOk = document.getElementById('btnOkAlerta') || modal.querySelector('button');
+            if (btnOk) {
+                btnOk.focus();
+                const lidarComEnter = (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        btnOk.click();
+                        document.removeEventListener('keydown', lidarComEnter, true);
+                    }
+                };
+                document.addEventListener('keydown', lidarComEnter, true);
+            }
+        }
+        function fecharAlertaCustomizado() {
+            const modal = document.getElementById('modalAlerta');
+            if (modal) modal.style.display = 'none';
+            // Recarrega a página ou atualiza o status após fechar o aviso de sucesso
+            window.location.reload();
+        }
+        function ativarEnterNoAlerta() {
+            setTimeout(() => {
+                // Procura o botão OK pelo texto dentro da tela
+                const botoes = document.querySelectorAll('button');
+                let btnOk = null;
+                botoes.forEach(b => {
+                    if (b.innerText.trim() === 'OK') btnOk = b;
+                });
+
+                if (btnOk) {
+                    btnOk.focus(); // Foca no botão OK
+
+                    const lidarComEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation(); // Impede que o Enter passe para o formulário de trás
+                            btnOk.click(); // Fecha o alerta
+                            document.removeEventListener('keydown', lidarComEnter, true);
+                        }
+                    };
+
+                    // O 'true' garante que o Enter seja interceptado antes de chegar nos inputs de trás
+                    document.addEventListener('keydown', lidarComEnter, true);
+                }
+            }, 100);
+        }
+    </script>
+</body>
+
+</html>

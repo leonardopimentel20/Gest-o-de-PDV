@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frente de Caixa - PDV</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #111111 0%, #1f1f1f 100%);
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        header h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-links a {
+            color: #e2e8f0;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .nav-links a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        .status-badge {
+            font-size: 0.85rem;
+            background: #333333;
+            color: #ffffff;
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid #555;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                overflow-y: auto;
+                height: auto;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        /* Caixa de Sugestões Flutuante */
+        .suggestions-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 120px;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 0 0 6px 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .client-search-container .suggestions-dropdown {
+            right: 0;
+        }
+
+        .suggestion-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.95rem;
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.highlight {
+            background-color: #e2e8f0;
+            color: #1e3a8a;
+            font-weight: bold;
+        }
+
+        .table-responsive {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+            position: sticky;
+            top: 0;
+        }
+
+        .summary-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 1.05rem;
+        }
+
+        .total-line {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #1e3a8a;
+            border-top: 2px solid #e2e8f0;
+            padding-top: 12px;
+            margin-top: 8px;
+        }
+
+        select,
+        input[type="text"],
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+
+        select,
+        input[type="text"] {
+            border: 1px solid #cbd5e1;
+            background: white;
+            margin-bottom: 12px;
+            font-weight: normal;
+        }
+
+        .btn-success {
+            background-color: #059669;
+            color: white;
+            transition: background 0.2s;
+        }
+
+        .btn-success:hover {
+            background-color: #047857;
+        }
+
+        .btn-danger {
+            background-color: #dc2626;
+            color: white;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+
+        .btn-danger:hover {
+            background-color: #b91c1c;
+        }
+
+        .client-search-container {
+            position: relative;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <h1>PDV - Frente de Caixa</h1>
+            <span id="statusCaixaBadge" class="status-badge">Verificando...</span>
+        </div>
+        <div class="nav-links">
+            <a href="index.html">Produtos</a>
+            <a href="clientes.html">Clientes & Crediário</a>
+            <a href="caixa.html">PDV / Vendas</a>
+            <a href="abertura_caixa.html">Caixa</a>
+            <a href="relatorio.html">Relatórios</a>
+            <a href="#" onclick="sair()" style="color: #fca5a5;">Sair</a>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Lado Esquerdo: Produtos e Carrinho -->
+        <div class="card">
+            <div class="search-box">
+                <input type="text" id="buscaProduto" placeholder="Digite o nome ou código de barras..."
+                    oninput="filtrarProdutos(this.value)"
+                    onkeydown="tratarTecladoBusca(event, 'listaSugestoesProdutos', adicionarPrimeiroProdutoLista)">
+                <button class="btn btn-success" style="width: 120px;"
+                    onclick="adicionarPrimeiroProdutoLista()">Adicionar</button>
+                <div id="listaSugestoesProdutos" class="suggestions-dropdown" style="display: none;"></div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="tabelaCarrinho">
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Qtd</th>
+                            <th>Preço Unit.</th>
+                            <th>Subtotal</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Itens adicionados aparecem aqui -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Lado Direito: Fechamento, Cliente e Pagamento -->
+        <div class="card" style="justify-content: space-between;">
+            <div>
+                <h3 style="margin-bottom: 15px; color: #1e3a8a;">Resumo da Venda</h3>
+                <div class="summary-line">
+                    <span>Itens no Carrinho:</span>
+                    <span id="qtdItens">0</span>
+                </div>
+                <div class="summary-line total-line">
+                    <span>Total a Pagar:</span>
+                    <span id="valorTotal">R$ 0,00</span>
+                </div>
+            </div>
+
+            <!-- Botão para acionar o Item Avulso -->
+            <button type="button" onclick="abrirModalAvulso()"
+                style="background-color: #2563eb; margin-top: 10px; padding: 8px 14px; font-size: 0.85rem; border-radius: 6px; color: white; border: none; cursor: pointer; font-weight: bold;">+
+                Item Avulso</button>
+
+            <!-- Estrutura da Sub-janela (Modal) -->
+            <div id="modalAvulso"
+                style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+                <div
+                    style="background: white; padding: 30px; border-radius: 8px; width: 400px; box-shadow: 0 4px 6px rgba(0,0,0,0.15);">
+                    <h3 style="color: #1e3a8a; margin-bottom: 15px;">Adicionar Item Avulso</h3>
+                    <form onsubmit="adicionarItemAvulso(event)">
+                        <div class="form-group"
+                            style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 5px;">
+                            <label>Descrição do Item:</label>
+                            <input type="text" id="avulso_nome" placeholder="Ex: Embalagem, Serviço, etc." required
+                                style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem;">
+                        </div>
+                        <div class="form-group"
+                            style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 5px;">
+                            <label>Preço Unitário (R$):</label>
+                            <input type="number" id="avulso_preco" step="0.01" placeholder="0.00" required
+                                style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem;">
+                        </div>
+                        <div class="form-group"
+                            style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 5px;">
+                            <label>Quantidade:</label>
+                            <input type="number" id="avulso_qtd" value="1" min="1" required
+                                style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem;">
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                            <button type="button" onclick="fecharModalAvulso()"
+                                style="background-color: #64748b; padding: 10px 15px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Cancelar</button>
+                            <button type="submit"
+                                style="background-color: #059669; padding: 10px 15px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Adicionar
+                                à Venda</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Contêiner pai com position: relative correto para o campo de clientes -->
+            <div style="position: relative; margin-bottom: 15px; margin-top: 15px;">
+                <label
+                    style="display: block; margin-bottom: 5px; font-weight: 600; color: #475569; font-size: 0.9rem;">Cliente
+                    (Obrigatório para Crediário):</label>
+                <input type="text" id="buscaCliente" placeholder="Digite para buscar cliente..."
+                    oninput="filtrarClientes(this.value)" onkeydown="tratarTecladoClientes(event)" autocomplete="off"
+                    style="width: 100%; padding: 8px; box-sizing: border-box;">
+
+                <input type="hidden" id="cliente_id_selecionado">
+
+                <!-- Dropdown ancorado perfeitamente logo abaixo -->
+                <div id="listaSugestoesClientes"
+                    style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #cbd5e1; border-radius: 4px; z-index: 9999; max-height: 150px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                </div>
+            </div>
+
+            <label
+                style="display: block; margin-bottom: 5px; font-weight: 600; color: #475569; font-size: 0.9rem;">Forma
+                de Pagamento:</label>
+            <select id="formaPagamento" style="width: 100%; padding: 8px; margin-bottom: 15px;">
+                <option value="dinheiro">Dinheiro</option>
+                <option value="cartao_credito">Cartão de Crédito</option>
+                <option value="cartao_debito">Cartão de Débito</option>
+                <option value="pix">Pix</option>
+                <option value="crediario">Crediário (Fiado)</option>
+            </select>
+
+            <button class="btn btn-success" onclick="finalizarVenda()"
+                style="font-size: 1.1rem; padding: 14px; width: 100%;">Finalizar Venda (F10)</button>
+        </div>
+    </div>
+    <script>
+        // No início do script da página caixa.html:
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+        const API_URL = 'http://localhost:3000';
+        let carrinho = [];
+        let sessaoCaixaAtiva = null;
+        let usuarioLogado = null;
+        let listaProdutosGlobal = [];
+        let listaClientesGlobal = [];
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+            if (usuario.cargo === 'operador') {
+                document.querySelectorAll('.nav-links a').forEach(a => {
+                    const href = a.getAttribute('href') || '';
+                    if (href.includes('index.html') || href.includes('clientes.html')) {
+                        a.style.display = 'none';
+                    }
+                });
+            }
+
+            usuarioLogado = usuario;
+
+            // Chama a função com o nome correto que você definiu no script:
+            await verificarCaixaAtivo();
+            await carregarDadosIniciais();
+        });
+
+        async function verificarCaixaAtivo() {
+            try {
+                const res = await fetch(`${API_URL}/sessoes/ativa`);
+                const data = await res.json();
+                const badge = document.getElementById('statusCaixaBadge');
+                if (!data.aberta) {
+                    badge.innerText = 'Caixa Fechado';
+                    badge.style.background = '#dc2626';
+                    mostrarAlerta('Atenção: Não há caixa aberto no momento! Abra um caixa antes de registrar vendas.');
+                    window.location.href = 'abertura_caixa.html';
+                } else {
+                    sessaoCaixaAtiva = data.sessao;
+                    badge.innerText = `Caixa Aberto (#${sessaoCaixaAtiva.id})`;
+                    badge.style.background = '#059669';
+                }
+            } catch (error) {
+                console.error('Erro ao verificar caixa:', error);
+            }
+        }
+
+        async function carregarDadosIniciais() {
+            try {
+                const [resProd, resCli] = await Promise.all([
+                    fetch(`${API_URL}/produtos`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${API_URL}/api/clientes`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                ]);
+                listaProdutosGlobal = await resProd.json();
+                listaClientesGlobal = await resCli.json();
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+            }
+        }
+
+        async function carregarClientesPDV() {
+            try {
+                const res = await fetch(`${API_URL}/api/clientes`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const clientes = await res.json();
+                return clientes;
+            } catch (err) {
+                console.error('Erro ao carregar clientes para o PDV:', err);
+                return [];
+            }
+        }
+
+        // --- NAVEGAÇÃO POR TECLADO NAS SUGESTÕES ---
+        function tratarTecladoBusca(e, dropdownId, acaoEnterPadrao) {
+            const dropdown = document.getElementById(dropdownId);
+            if (dropdown.style.display === 'none') {
+                if (e.key === 'Enter') acaoEnterPadrao();
+                return;
+            }
+
+            const items = dropdown.querySelectorAll('.suggestion-item');
+            if (items.length === 0) return;
+
+            let currentIndex = Array.from(items).findIndex(item => item.classList.contains('highlight'));
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (currentIndex < items.length - 1) currentIndex++;
+                else currentIndex = 0;
+                atualizarDestaqueItem(items, currentIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (currentIndex > 0) currentIndex--;
+                else currentIndex = items.length - 1;
+                atualizarDestaqueItem(items, currentIndex);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (currentIndex >= 0 && currentIndex < items.length) {
+                    selecionarProduto(items[currentIndex].produtoData);
+                } else if (items.length === 1) {
+                    items[0].click();
+                } else {
+                    acaoEnterPadrao();
+                }
+            }
+        }
+
+        function atualizarDestaqueItem(items, index) {
+            items.forEach(item => item.classList.remove('highlight'));
+            if (index >= 0 && index < items.length) {
+                items[index].classList.add('highlight');
+                items[index].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        // --- FILTRO E SUGESTÕES DE PRODUTOS ---
+        function tratarTecladoProdutos(e) {
+            const dropdown = document.getElementById('listaSugestoesProdutos');
+            if (dropdown.style.display === 'none') {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    adicionarPrimeiroProdutoLista();
+                }
+                return;
+            }
+
+            const items = dropdown.querySelectorAll('.suggestion-item');
+            if (items.length === 0) return;
+
+            let currentIndex = Array.from(items).findIndex(item => item.classList.contains('highlight'));
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (currentIndex < items.length - 1) currentIndex++;
+                else currentIndex = 0;
+                atualizarDestaqueItem(items, currentIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (currentIndex > 0) currentIndex--;
+                else currentIndex = items.length - 1;
+                atualizarDestaqueItem(items, currentIndex);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (currentIndex >= 0 && currentIndex < items.length) {
+                    items[currentIndex].click();
+                } else if (items.length === 1) {
+                    items[0].click();
+                } else {
+                    adicionarPrimeiroProdutoLista();
+                }
+            }
+        }
+
+        // --- NAVEGAÇÃO POR TECLADO PARA CLIENTES ---
+        function tratarTecladoClientes(e) {
+            const dropdown = document.getElementById('listaSugestoesClientes');
+            if (dropdown.style.display === 'none') return;
+
+            const items = dropdown.querySelectorAll('.suggestion-item');
+            if (items.length === 0) return;
+
+            let currentIndex = Array.from(items).findIndex(item => item.classList.contains('highlight'));
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (currentIndex < items.length - 1) currentIndex++;
+                else currentIndex = 0;
+                atualizarDestaqueItem(items, currentIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (currentIndex > 0) currentIndex--;
+                else currentIndex = items.length - 1;
+                atualizarDestaqueItem(items, currentIndex);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (currentIndex >= 0 && currentIndex < items.length) {
+                    items[currentIndex].click();
+                } else if (items.length === 1) {
+                    items[0].click();
+                }
+            }
+        }
+
+        function atualizarDestaqueItem(items, index) {
+            items.forEach(item => {
+                item.classList.remove('highlight');
+                item.style.backgroundColor = 'white';
+            });
+            if (index >= 0 && index < items.length) {
+                items[index].classList.add('highlight');
+                items[index].style.backgroundColor = '#f1f5f9';
+                items[index].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        // --- FILTRO DE PRODUTOS ---
+        function filtrarProdutos(termo) {
+            const container = document.getElementById('listaSugestoesProdutos');
+            if (!termo.trim()) {
+                container.style.display = 'none';
+                return;
+            }
+
+            const filtrados = listaProdutosGlobal.filter(p =>
+                p.codigo_barras.toLowerCase().includes(termo.toLowerCase()) ||
+                p.nome.toLowerCase().includes(termo.toLowerCase())
+            );
+
+            if (filtrados.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = '';
+            filtrados.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.style.padding = '8px';
+                div.style.cursor = 'pointer';
+                div.innerHTML = `<b>${p.nome}</b> (Cód: ${p.codigo_barras}) - R$ ${Number(p.preco_venda).toFixed(2)}`;
+                div.produtoData = p; // Armazena o produto no elemento para referência futura
+                div.onmousedown = () => selecionarProduto(p);
+                container.appendChild(div);
+            });
+            container.style.display = 'block';
+        }
+
+        function selecionarProduto(produto) {
+            document.getElementById('buscaProduto').value = '';
+            document.getElementById('listaSugestoesProdutos').style.display = 'none';
+            adicionarAoCarrinho(produto);
+        }
+
+        function adicionarAoCarrinho(produto) {
+            // Converte o estoque para número para evitar conflito de tipo do banco de dados
+            const estoque = Number(produto.estoque_atual || 0);
+
+            if (estoque <= 0) {
+                mostrarAlerta('Produto sem estoque disponível!');
+                return;
+            }
+
+            const itemExistente = carrinho.find(item => item.produto_id === produto.id);
+            if (itemExistente) {
+                if (itemExistente.quantidade + 1 > estoque) {
+                    mostrarAlerta('Quantidade excede o estoque atual!');
+                    return;
+                }
+                itemExistente.quantidade++;
+            } else {
+                carrinho.push({
+                    produto_id: produto.id,
+                    nome: produto.nome,
+                    preco_unitario: Number(produto.preco_venda),
+                    quantidade: 1
+                });
+            }
+            atualizarCarrinho();
+            document.getElementById('buscaProduto').focus();
+        }
+
+        function adicionarPrimeiroProdutoLista() {
+            const termo = document.getElementById('buscaProduto').value.trim();
+            if (!termo) return;
+
+            const produto = listaProdutosGlobal.find(p => p.codigo_barras === termo || p.nome.toLowerCase().includes(termo.toLowerCase()));
+            if (!produto) {
+                mostrarAlerta('Produto não encontrado!');
+                return;
+            }
+            document.getElementById('buscaProduto').value = '';
+            document.getElementById('listaSugestoesProdutos').style.display = 'none';
+            adicionarAoCarrinho(produto);
+        }
+
+        // --- FILTRO DE CLIENTES ---
+        function filtrarClientes(termo) {
+            const container = document.getElementById('listaSugestoesClientes');
+            if (!termo.trim()) {
+                document.getElementById('cliente_id_selecionado').value = '';
+                container.style.display = 'none';
+                return;
+            }
+
+            const filtrados = listaClientesGlobal.filter(c => c.nome.toLowerCase().includes(termo.toLowerCase()));
+
+            container.innerHTML = '';
+
+            // Opção para cliente avulso
+            const divAvulso = document.createElement('div');
+            divAvulso.className = 'suggestion-item';
+            divAvulso.style.padding = '8px';
+            divAvulso.style.cursor = 'pointer';
+            divAvulso.innerHTML = '<i>-- Cliente Avulso / À Vista --</i>';
+            divAvulso.onclick = () => selecionarCliente({ id: '', nome: '' });
+            container.appendChild(divAvulso);
+
+            filtrados.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.style.padding = '8px';
+                div.style.cursor = 'pointer';
+                div.innerHTML = `<b>${c.nome}</b> (${c.telefone || 'Sem tel'})`;
+                div.onclick = () => selecionarCliente(c);
+                container.appendChild(div);
+            });
+
+            container.style.display = 'block';
+        }
+
+        async function selecionarCliente(cliente) {
+            document.getElementById('buscaCliente').value = cliente.nome;
+            document.getElementById('cliente_id_selecionado').value = cliente.id;
+            document.getElementById('listaSugestoesClientes').style.display = 'none';
+        }
+
+        function alterarQtd(index, qtd) {
+            carrinho[index].quantidade = Number(qtd);
+            if (carrinho[index].quantidade <= 0) {
+                carrinho.splice(index, 1);
+            }
+            atualizarCarrinho();
+        }
+
+        function removerItem(index) {
+            carrinho.splice(index, 1);
+            atualizarCarrinho();
+        }
+
+        function atualizarCarrinho() {
+            const tbody = document.querySelector('#tabelaCarrinho tbody');
+            tbody.innerHTML = '';
+
+            let totalGeral = 0;
+            let totalItens = 0;
+
+            carrinho.forEach((item, index) => {
+                const subtotal = item.quantidade * item.preco_unitario;
+                totalGeral += subtotal;
+                totalItens += item.quantidade;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.nome}</td>
+                    <td><input type="number" value="${item.quantidade}" min="1" style="width: 60px; padding: 4px;" onchange="alterarQtd(${index}, this.value)"></td>
+                    <td>R$ ${item.preco_unitario.toFixed(2)}</td>
+                    <td>R$ ${subtotal.toFixed(2)}</td>
+                    <td><button class="btn btn-danger" onclick="removerItem(${index})">X</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('qtdItens').innerText = totalItens;
+            document.getElementById('valorTotal').innerText = `R$ ${totalGeral.toFixed(2)}`;
+        }
+
+        function abrirModalAvulso() {
+            document.getElementById('modalAvulso').style.display = 'flex';
+        }
+
+        function fecharModalAvulso() {
+            document.getElementById('modalAvulso').style.display = 'none';
+            document.getElementById('avulso_nome').value = '';
+            document.getElementById('avulso_preco').value = '';
+            document.getElementById('avulso_qtd').value = '1';
+        }
+
+        function adicionarItemAvulso(event) {
+            event.preventDefault();
+            const nome = document.getElementById('avulso_nome').value.trim();
+            const preco = parseFloat(document.getElementById('avulso_preco').value);
+            const quantidade = parseInt(document.getElementById('avulso_qtd').value);
+
+            if (!nome || isNaN(preco) || preco <= 0 || isNaN(quantidade) || quantidade <= 0) {
+                mostrarAlerta('Preencha os campos corretamente.');
+                return;
+            }
+
+            // Cria o objeto do item avulso e insere no array do carrinho existente na tela de vendas
+            const itemAvulso = {
+                produto_id: null, // Identifica que é um item avulso sem cadastro fixo
+                codigo_barras: 'AVULSO',
+                nome: `[Avulso] ${nome}`,
+                preco_unitario: preco,
+                quantidade: quantidade
+            };
+
+            if (typeof carrinho !== 'undefined') {
+                carrinho.push(itemAvulso);
+                if (typeof atualizarCarrinho === 'function') {
+                    atualizarCarrinho();
+                }
+            }
+
+            fecharModalAvulso();
+        }
+
+        async function finalizarVenda() {
+            if (carrinho.length === 0) {
+                mostrarAlerta('O carrinho está vazio!');
+                return;
+            }
+
+            if (!sessaoCaixaAtiva) {
+                mostrarAlerta('Nenhuma sessão de caixa ativa encontrada!');
+                return;
+            }
+
+            const formaPagamento = document.getElementById('formaPagamento').value;
+            let clienteId = document.getElementById('cliente_id_selecionado').value;
+
+            // Se o usuário digitou o nome mas não clicou na sugestão, tenta achar pelo nome digitado
+            const nomeDigitado = document.getElementById('buscaCliente').value.trim();
+            if (formaPagamento === 'crediario' && !clienteId && nomeDigitado) {
+                const clienteEncontrado = listaClientesGlobal.find(c => c.nome.toLowerCase() === nomeDigitado.toLowerCase());
+                if (clienteEncontrado) {
+                    clienteId = clienteEncontrado.id;
+                }
+            }
+
+            if (formaPagamento === 'crediario' && !clienteId) {
+                mostrarAlerta('É obrigatório selecionar um cliente cadastrado da lista para registrar vendas no crediário!');
+                return;
+            }
+
+            const dadosVenda = {
+                sessao_caixa_id: sessaoCaixaAtiva.id,
+                usuario_id: usuarioLogado.id,
+                cliente_id: clienteId ? Number(clienteId) : null,
+                forma_pagamento: formaPagamento,
+                itens: carrinho.map(i => ({
+                    produto_id: i.produto_id,
+                    quantidade: i.quantidade,
+                    preco_unitario: i.preco_unitario
+                }))
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/vendas`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(dadosVenda)
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    mostrarAlerta('Venda realizada com sucesso!');
+                    carrinho = [];
+                    atualizarCarrinho();
+                    document.getElementById('buscaCliente').value = '';
+                    document.getElementById('cliente_id_selecionado').value = '';
+                    document.getElementById('buscaProduto').focus();
+                } else {
+                    // Exibe a mensagem exata enviada pelo backend (ex: falta de estoque, caixa fechado, etc)
+                    mostrarAlerta(data.error || data.erro || 'Erro ao finalizar venda.');
+                }
+            } catch (error) {
+                console.error('Erro detalhado:', error);
+                mostrarAlerta('Erro de conexão ao processar a venda.');
+            }
+        }
+
+        function sair() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('usuario');
+            window.location.href = 'login.html';
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'F10') {
+                e.preventDefault();
+                finalizarVenda();
+            }
+        });
+
+        function mostrarAlerta(mensagem) {
+            const modal = document.getElementById('modalAlerta');
+            document.getElementById('textoAlertaCustomizado').innerText = mensagem;
+            modal.style.display = 'flex';
+
+            // Procura o botão OK do modal, foca nele e ativa o Enter
+            setTimeout(() => {
+                const btnOk = modal.querySelector('button');
+                if (btnOk) {
+                    btnOk.focus();
+                    const lidarComEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            btnOk.click();
+                            document.removeEventListener('keydown', lidarComEnter, true);
+                        }
+                    };
+                    document.addEventListener('keydown', lidarComEnter, true);
+                }
+            }, 50);
+        }
+        function fecharAlertaCustomizado() {
+            document.getElementById('modalAlerta').style.display = 'none';
+        }
+        // Adicione esta função e chame-a sempre que o seu alerta for exibido na tela:
+        function ativarEnterNoAlerta() {
+            // Dá um pequeno intervalo para garantir que o modal já foi renderizado
+            setTimeout(() => {
+                // Procura automaticamente pelo botão de OK/Confirmação dentro do modal visível
+                const btnOk = document.querySelector('.modal button, div[style*="flex"] button, button.btn-ok, .swal2-confirm');
+
+                if (btnOk) {
+                    btnOk.focus(); // Joga o foco para o botão OK
+
+                    const lidarComEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            btnOk.click(); // Simula o clique e fecha o modal
+                            document.removeEventListener('keydown', lidarComEnter);
+                        }
+                    };
+
+                    document.addEventListener('keydown', lidarComEnter);
+                }
+            }, 100);
+        }
+    </script>
+    <!-- Modal de Alerta Customizado -->
+    <div id="modalAlerta"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+        <div
+            style="background: white; padding: 25px; border-radius: 8px; width: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); text-align: center;">
+            <h3 style="color: #1e3a8a; margin-bottom: 10px;">Atenção</h3>
+            <p id="textoAlertaCustomizado"
+                style="color: #475569; margin-bottom: 20px; font-size: 1rem; line-height: 1.4;"></p>
+            <button type="button" onclick="fecharAlertaCustomizado()"
+                style="background-color: #2563eb; padding: 8px 20px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">OK</button>
+        </div>
+    </div>
+</body>
+
+</html>
