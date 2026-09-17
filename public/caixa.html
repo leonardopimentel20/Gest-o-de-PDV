@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 
 <head>
+    <script src="/js/sessao.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Frente de Caixa - PDV</title>
@@ -375,7 +376,7 @@
         if (!token) {
             window.location.href = 'login.html';
         }
-        const API_URL = 'http://localhost:3000';
+        const API_URL = window.location.origin;
         let carrinho = [];
         let sessaoCaixaAtiva = null;
         let usuarioLogado = null;
@@ -656,6 +657,7 @@
 
         // --- FILTRO DE CLIENTES ---
         function filtrarClientes(termo) {
+            document.getElementById('cliente_id_selecionado').value = '';
             const container = document.getElementById('listaSugestoesClientes');
             if (!termo.trim()) {
                 document.getElementById('cliente_id_selecionado').value = '';
@@ -776,7 +778,9 @@
             fecharModalAvulso();
         }
 
+        let vendaEmAndamento = false;
         async function finalizarVenda() {
+            if (vendaEmAndamento) return;
             if (carrinho.length === 0) {
                 mostrarAlerta('O carrinho está vazio!');
                 return;
@@ -811,11 +815,13 @@
                 forma_pagamento: formaPagamento,
                 itens: carrinho.map(i => ({
                     produto_id: i.produto_id,
+                    nome: i.nome,
                     quantidade: i.quantidade,
                     preco_unitario: i.preco_unitario
                 }))
             };
 
+            vendaEmAndamento = true;
             try {
                 const res = await fetch(`${API_URL}/vendas`, {
                     method: 'POST',
@@ -830,6 +836,7 @@
                 if (res.ok) {
                     mostrarAlerta('Venda realizada com sucesso!');
                     carrinho = [];
+                    await carregarDadosIniciais();
                     atualizarCarrinho();
                     document.getElementById('buscaCliente').value = '';
                     document.getElementById('cliente_id_selecionado').value = '';
@@ -840,7 +847,9 @@
                 }
             } catch (error) {
                 console.error('Erro detalhado:', error);
-                mostrarAlerta('Erro de conexão ao processar a venda.');
+                mostrarAlerta('Erro de conexão. Consulte o histórico antes de tentar novamente.');
+            } finally {
+                vendaEmAndamento = false;
             }
         }
 

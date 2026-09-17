@@ -5,7 +5,8 @@
   "description": "Sistema de PDV da loja",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test tests/regressao.test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

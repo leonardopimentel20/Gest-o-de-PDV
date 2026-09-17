@@ -1,53 +1,34 @@
-// Validações simples de entrada, sem depender de bibliotecas externas.
-
-function ehTextoValido(valor, tamanhoMinimo = 1, tamanhoMaximo = 255) {
-    return typeof valor === 'string' &&
-        valor.trim().length >= tamanhoMinimo &&
-        valor.trim().length <= tamanhoMaximo;
+function ehTextoValido(v, min = 1, max = 255) {
+    return typeof v === 'string' && v.trim().length >= min && v.trim().length <= max;
 }
-
-function ehNumeroPositivo(valor) {
-    const n = Number(valor);
-    return !Number.isNaN(n) && n >= 0;
+function ehNumeroPositivo(v) {
+    return (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(Number(v)) && Number(v) >= 0;
 }
-
-function ehInteiroPositivo(valor) {
-    const n = Number(valor);
-    return Number.isInteger(n) && n > 0;
+function ehInteiroPositivo(v) {
+    return ehNumeroPositivo(v) && Number.isSafeInteger(Number(v)) && Number(v) > 0;
 }
-
+function estoqueValido(v) { return ehNumeroPositivo(v) && Number.isSafeInteger(Number(v)); }
 function validarProduto(body) {
     const erros = [];
-    if (!ehTextoValido(body.codigo_barras, 1, 100)) erros.push('Código de barras inválido.');
+    if (!ehTextoValido(body.codigo_barras, 1, 50)) erros.push('Código de barras inválido.');
     if (!ehTextoValido(body.nome, 1, 150)) erros.push('Nome do produto inválido.');
-    if (!body.categoria_id || !ehInteiroPositivo(body.categoria_id)) erros.push('Categoria inválida.');
-    if (!ehNumeroPositivo(body.preco_custo)) erros.push('Preço de custo inválido.');
-    if (!ehNumeroPositivo(body.preco_venda)) erros.push('Preço de venda inválido.');
-    if (body.estoque_atual !== undefined && Number(body.estoque_atual) < 0) erros.push('Estoque inicial não pode ser negativo.');
+    if (body.categoria_id != null && body.categoria_id !== '' && !ehInteiroPositivo(body.categoria_id)) erros.push('Categoria inválida.');
+    if (!ehNumeroPositivo(body.preco_custo) || !ehNumeroPositivo(body.preco_venda) || Number(body.preco_venda) <= 0) erros.push('Preços inválidos.');
+    if (Number(body.preco_venda) < Number(body.preco_custo)) erros.push('Preço de venda menor que o custo.');
+    if (!estoqueValido(body.estoque_atual)) erros.push('Estoque deve ser um inteiro não negativo.');
+    if (body.estoque_minimo !== undefined && !estoqueValido(body.estoque_minimo)) erros.push('Estoque mínimo inválido.');
     return erros;
 }
-
 function validarItensVenda(itens) {
+    if (!Array.isArray(itens) || !itens.length) return ['A venda precisa ter ao menos um item.'];
     const erros = [];
-    if (!Array.isArray(itens) || itens.length === 0) {
-        erros.push('A venda precisa ter ao menos um item.');
-        return erros;
-    }
     itens.forEach((item, i) => {
-        if (!item.produto_id || !ehInteiroPositivo(item.produto_id)) {
-            erros.push(`Item ${i + 1}: produto inválido.`);
-        }
-        if (!ehInteiroPositivo(item.quantidade)) {
-            erros.push(`Item ${i + 1}: quantidade inválida.`);
-        }
+        if (!item || typeof item !== 'object') { erros.push(`Item ${i + 1} inválido.`); return; }
+        if (item.produto_id != null && !ehInteiroPositivo(item.produto_id)) erros.push('Produto inválido.');
+        if (!ehInteiroPositivo(item.quantidade)) erros.push('Quantidade inválida.');
+        if (!ehNumeroPositivo(item.preco_unitario)) erros.push('Preço inválido.');
+        if (item.nome !== undefined && !ehTextoValido(item.nome)) erros.push('Nome do item inválido.');
     });
     return erros;
 }
-
-module.exports = {
-    ehTextoValido,
-    ehNumeroPositivo,
-    ehInteiroPositivo,
-    validarProduto,
-    validarItensVenda
-};
+module.exports = { ehTextoValido, ehNumeroPositivo, ehInteiroPositivo, validarProduto, validarItensVenda };

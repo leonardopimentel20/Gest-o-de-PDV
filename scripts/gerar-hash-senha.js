@@ -5,7 +5,7 @@
 //
 // O hash gerado deve ser colocado na coluna `senha_hash` da tabela `usuarios`.
 
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 
 const senha = process.argv[2];
 

@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 
 <head>
+    <script src="/js/sessao.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clientes & Crediário - Loja de Variedades</title>
@@ -221,7 +222,7 @@
 
             window.location.href = 'caixa.html'; // Redireciona para a tela de Vendas/PDV
         }
-        const API_URL = 'http://localhost:3000';
+        const API_URL = window.location.origin;
         let listaClientesGlobal = [];
         let linkWhatsAppGlobal = '';
 

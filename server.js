@@ -1,22 +1,23 @@
-process.on('uncaughtException', (err) => {
-    console.error('💥 Erro não tratado (Crash):', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('💥 Promessa rejeitada não tratada:', reason);
-});
-
 const express = require('express');
-const cors = require('cors');
 const db = require('./db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
+const path = require('path');
+const { verificarToken } = require('./middleware/auth');
+const { validarProduto, validarItensVenda, ehNumeroPositivo, ehInteiroPositivo } = require('./utils/validacao');
 const app = express();
 app.use(express.json());
-app.use(cors());
-app.use(express.static('public'));
+app.disable('x-powered-by');
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
+app.get('/health', async (req, res) => {
+    try {
+        await db.query('SELECT 1');
+        res.json({ servico: 'loja-sistema', instancia: require('crypto').createHash('sha256').update(__dirname.toLowerCase()).digest('hex') });
+    } catch { res.status(503).json({ erro: 'Banco de dados indisponível.' }); }
+});
+app.use((req, res, next) => req.path === '/login' && req.method === 'POST' ? next() : verificarToken(req, res, next));
 
 // 1. Rota para Listar Produtos corrigida para retornar os dados corretamente
 app.get('/produtos', async (req, res) => {
@@ -49,33 +50,21 @@ app.get('/categorias', async (req, res) => {
 app.post('/produtos', async (req, res) => {
     const { codigo_barras, nome, categoria_id, preco_custo, preco_venda, estoque_atual, estoque_minimo } = req.body;
 
-    if (!codigo_barras || !nome || !preco_venda) {
-        return res.status(400).json({ erro: 'Preencha os campos obrigatórios do produto.' });
-    }
-
+    const erros = validarProduto(req.body);
+    if (erros.length) return res.status(400).json({ erro: erros.join(' ') });
     const precoCustoNum = Number(preco_custo);
     const precoVendaNum = Number(preco_venda);
     const estoqueNum = Number(estoque_atual);
-
-    if (isNaN(precoCustoNum) || isNaN(precoVendaNum) || isNaN(estoqueNum)) {
-        return res.status(400).json({ erro: 'Preços e estoque devem ser números válidos.' });
-    }
-
-    if (estoqueNum < 0) {
-        return res.status(400).json({ erro: 'O estoque inicial não pode ser negativo.' });
-    }
-    if (precoVendaNum < precoCustoNum) {
-        return res.status(400).json({ erro: 'O preço de venda não pode ser menor que o preço de custo.' });
-    }
 
     try {
         const [result] = await db.query(
             `INSERT INTO produtos (codigo_barras, nome, categoria_id, preco_custo, preco_venda, estoque_atual, estoque_minimo) 
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [codigo_barras, nome, categoria_id || null, precoCustoNum, precoVendaNum, estoqueNum, estoque_minimo || 5]
+            [codigo_barras, nome, categoria_id || null, precoCustoNum, precoVendaNum, estoqueNum, estoque_minimo ?? 5]
         );
         res.status(201).json({ mensagem: 'Produto cadastrado com sucesso!', id: result.insertId });
     } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ erro: 'Código de barras já cadastrado.' });
         console.error('Erro ao cadastrar produto:', error);
         res.status(500).json({ erro: 'Erro ao cadastrar produto.' });
     }
@@ -83,105 +72,58 @@ app.post('/produtos', async (req, res) => {
 
 // 3. Rota Única e Segura para Registrar Venda (PDV) com Validação de Crediário e Estoque[cite: 1]
 app.post('/vendas', async (req, res) => {
-    const connection = await db.getConnection();
+    const { sessao_caixa_id, cliente_id, forma_pagamento, itens } = req.body;
+    const usuario_id = req.usuario.id;
+    const erros = validarItensVenda(itens);
+    if (!ehInteiroPositivo(sessao_caixa_id)) erros.push('Caixa inválido.');
+    if (!['dinheiro', 'cartao_credito', 'cartao_debito', 'pix', 'crediario'].includes(forma_pagamento)) erros.push('Forma de pagamento inválida.');
+    if (cliente_id != null && !ehInteiroPositivo(cliente_id)) erros.push('Cliente inválido.');
+    if (forma_pagamento === 'crediario' && !cliente_id) erros.push('Selecione um cliente para o crediário.');
+    if (erros.length) return res.status(400).json({ erro: erros.join(' ') });
+    let connection;
+    let transacao = false;
+    const recusar = mensagem => { const erro = new Error(mensagem); erro.status = 400; throw erro; };
     try {
+        connection = await db.getConnection();
         await connection.beginTransaction();
-
-        const { sessao_caixa_id, usuario_id, cliente_id, forma_pagamento, itens } = req.body;
-
-        if (!itens || itens.length === 0) {
-            await connection.release();
-            return res.status(400).json({ erro: 'O carrinho está vazio.' });
-        }
-
-        // Calcular valor total da venda
-        let valor_total = 0;
-        for (let item of itens) {
-            if (item.quantidade <= 0 || item.preco_unitario < 0) {
-                await connection.release();
-                return res.status(400).json({ erro: 'Valores ou quantidades inválidas nos itens.' });
-            }
-            valor_total += item.quantidade * item.preco_unitario;
-        }
-
-        // Validação estrita de Limite para Crediário
-        if (forma_pagamento === 'crediario') {
-            if (!cliente_id) {
-                await connection.release();
-                return res.status(400).json({ erro: 'É obrigatório selecionar um cliente para vendas no crediário.' });
-            }
-
-            const [clienteRows] = await connection.query('SELECT limite_credito FROM clientes WHERE id = ?', [cliente_id]);
-            if (clienteRows.length === 0) {
-                await connection.release();
-                return res.status(400).json({ erro: 'Cliente não encontrado.' });
-            }
-            const limiteTotal = Number(clienteRows[0].limite_credito);
-
-            const [dividasRows] = await connection.query(
-                "SELECT SUM(valor_total) as total_devido FROM vendas WHERE cliente_id = ? AND forma_pagamento = 'crediario'",
-                [cliente_id]
-            );
-            const totalDevido = Number(dividasRows[0].total_devido || 0);
-            const limiteDisponivel = limiteTotal - totalDevido;
-
-            if (valor_total > limiteDisponivel) {
-                await connection.release();
-                return res.status(400).json({
-                    erro: `Limite insuficiente! O cliente possui R$ ${limiteDisponivel.toFixed(2)} disponíveis de R$ ${limiteTotal.toFixed(2)}.`
-                });
+        transacao = true;
+        const [sessoes] = await connection.query("SELECT id FROM sessoes_caixa WHERE id = ? AND status = 'aberto' FOR UPDATE", [sessao_caixa_id]);
+        if (!sessoes.length) recusar('O caixa está fechado. Abra um caixa antes de vender.');
+        const totalCentavos = itens.reduce((total, item) => total + Math.round(Number(item.preco_unitario) * 100) * Number(item.quantidade), 0);
+        if (!Number.isSafeInteger(totalCentavos) || totalCentavos <= 0) recusar('Total da venda inválido.');
+        const valor_total = totalCentavos / 100;
+        if (cliente_id) {
+            const [clientes] = await connection.query('SELECT limite_credito FROM clientes WHERE id = ? FOR UPDATE', [cliente_id]);
+            if (!clientes.length) recusar('Cliente não encontrado.');
+            if (forma_pagamento === 'crediario') {
+                const [dividas] = await connection.query("SELECT COALESCE(SUM(valor_total), 0) AS total_devido FROM vendas WHERE cliente_id = ? AND forma_pagamento = 'crediario'", [cliente_id]);
+                const disponivel = Math.round(Number(clientes[0].limite_credito) * 100) - Math.round(Number(dividas[0].total_devido) * 100);
+                if (totalCentavos > disponivel) recusar(`Limite insuficiente! Disponível: R$ ${(disponivel / 100).toFixed(2)}.`);
             }
         }
-
-        // Inserir a venda
-        const [vendaResult] = await connection.query(
-            'INSERT INTO vendas (sessao_caixa_id, usuario_id, cliente_id, valor_total, forma_pagamento, criado_em) VALUES (?, ?, ?, ?, ?, NOW())',
-            [sessao_caixa_id, usuario_id, cliente_id || null, valor_total, forma_pagamento]
-        );
-        const vendaId = vendaResult.insertId;
-
-        // Inserir itens e validar o estoque de forma segura
-        for (let item of itens) {
-            let nomeItem = item.nome || 'Item Avulso';
-
+        const [venda] = await connection.query('INSERT INTO vendas (sessao_caixa_id, usuario_id, cliente_id, valor_total, forma_pagamento, criado_em) VALUES (?, ?, ?, ?, ?, NOW())', [sessao_caixa_id, usuario_id, cliente_id || null, valor_total, forma_pagamento]);
+        for (const item of [...itens].sort((a, b) => Number(a.produto_id || 0) - Number(b.produto_id || 0))) {
+            let nome = item.nome || 'Item Avulso';
             if (item.produto_id) {
-                const [produtoRows] = await connection.query(
-                    'SELECT estoque_atual, nome FROM produtos WHERE id = ?',
-                    [item.produto_id]
-                );
-
-                if (produtoRows.length === 0) {
-                    throw new Error(`Produto ID ${item.produto_id} não encontrado.`);
-                }
-
-                const estoqueAtual = Number(produtoRows[0].estoque_atual);
-                if (estoqueAtual < item.quantidade) {
-                    throw new Error(`Estoque insuficiente para o produto "${produtoRows[0].nome}". Disponível: ${estoqueAtual}, Solicitado: ${item.quantidade}`);
-                }
-
-                nomeItem = produtoRows[0].nome;
-
-                await connection.query(
-                    'UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?',
-                    [item.quantidade, item.produto_id]
-                );
+                const [produtos] = await connection.query('SELECT estoque_atual, nome FROM produtos WHERE id = ? FOR UPDATE', [item.produto_id]);
+                if (!produtos.length) recusar('Produto não encontrado.');
+                if (Number(produtos[0].estoque_atual) < Number(item.quantidade)) recusar(`Estoque insuficiente para "${produtos[0].nome}".`);
+                nome = produtos[0].nome;
+                await connection.query('UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?', [item.quantidade, item.produto_id]);
             }
-
-            await connection.query(
-                'INSERT INTO itens_venda (venda_id, produto_id, quantidade, preco_unitario, nome_produto_avulso) VALUES (?, ?, ?, ?, ?)',
-                [vendaId, item.produto_id || null, item.quantidade, item.preco_unitario, nomeItem]
-            );
+            await connection.query('INSERT INTO itens_venda (venda_id, produto_id, quantidade, preco_unitario, nome_produto_avulso) VALUES (?, ?, ?, ?, ?)', [venda.insertId, item.produto_id || null, item.quantidade, Math.round(Number(item.preco_unitario) * 100) / 100, nome]);
         }
-
         await connection.commit();
-        connection.release();
-        res.status(201).json({ mensagem: 'Venda realizada com sucesso!', venda_id: vendaId, valor_total });
-
+        transacao = false;
+        res.status(201).json({ mensagem: 'Venda realizada com sucesso!', venda_id: venda.insertId, valor_total });
     } catch (error) {
-        await connection.rollback();
-        connection.release();
-        console.error('Erro ao processar venda:', error);
-        res.status(500).json({ erro: error.message || 'Erro ao processar a venda no servidor.' });
+        if (transacao) {
+            try { await connection.rollback(); } catch (rollbackError) { console.error('Erro no rollback:', rollbackError); }
+        }
+        if (!error.status) console.error('Erro ao processar venda:', error);
+        res.status(error.status || 500).json({ erro: error.status ? error.message : 'Não foi possível registrar a venda. Consulte o histórico antes de tentar novamente.' });
+    } finally {
+        if (connection) connection.release();
     }
 });
 
@@ -222,21 +164,28 @@ app.get('/sessoes/ativa', async (req, res) => {
 
 // Abrir novo caixa
 app.post('/sessoes/abrir', async (req, res) => {
-    const { usuario_id, valor_abertura } = req.body;
+    const usuario_id = req.usuario.id;
+    const { valor_abertura } = req.body;
+    if (!ehNumeroPositivo(valor_abertura)) return res.status(400).json({ error: 'Valor de abertura invalido.' });
+    let connection;
+    let bloqueado = false;
     try {
-        const [rows] = await db.query("SELECT * FROM sessoes_caixa WHERE status = 'aberto'");
-        if (rows.length > 0) {
-            return res.status(400).json({ error: 'Já existe um caixa aberto no momento!' });
-        }
-
-        const [result] = await db.query(
-            "INSERT INTO sessoes_caixa (usuario_id, valor_abertura, status, data_abertura) VALUES (?, ?, 'aberto', NOW())",
-            [usuario_id, valor_abertura]
-        );
+        connection = await db.getConnection();
+        const [lock] = await connection.query("SELECT GET_LOCK(CONCAT(DATABASE(), ':abrir_caixa'), 5) AS adquirido");
+        bloqueado = Number(lock[0].adquirido) === 1;
+        if (!bloqueado) return res.status(409).json({ error: 'Outra abertura em andamento. Aguarde.' });
+        const [rows] = await connection.query("SELECT id FROM sessoes_caixa WHERE status = 'aberto'");
+        if (rows.length) return res.status(409).json({ error: 'Ja existe um caixa aberto.' });
+        const [result] = await connection.query("INSERT INTO sessoes_caixa (usuario_id, valor_abertura, status, data_abertura) VALUES (?, ?, 'aberto', NOW())", [usuario_id, valor_abertura]);
         res.json({ success: true, sessao_id: result.insertId });
     } catch (error) {
         console.error('Erro ao abrir caixa:', error);
-        res.status(500).json({ error: 'Erro ao abrir o caixa' });
+        res.status(500).json({ error: 'Erro ao abrir o caixa.' });
+    } finally {
+        if (connection) {
+            try { if (bloqueado) await connection.query("SELECT RELEASE_LOCK(CONCAT(DATABASE(), ':abrir_caixa'))"); }
+            finally { connection.release(); }
+        }
     }
 });
 
@@ -244,11 +193,13 @@ app.post('/sessoes/abrir', async (req, res) => {
 app.post('/sessoes/fechar/:id', async (req, res) => {
     const { id } = req.params;
     const { valor_fechamento } = req.body;
+    if (!ehInteiroPositivo(id) || !ehNumeroPositivo(valor_fechamento)) return res.status(400).json({ error: 'Valor de fechamento ou caixa inválido.' });
     try {
-        await db.query(
-            "UPDATE sessoes_caixa SET valor_fechamento = ?, status = 'fechado', data_fechamento = NOW() WHERE id = ?",
+        const [result] = await db.query(
+            "UPDATE sessoes_caixa SET valor_fechamento = ?, status = 'fechado', data_fechamento = NOW() WHERE id = ? AND status = 'aberto'",
             [valor_fechamento, id]
         );
+        if (!result.affectedRows) return res.status(409).json({ error: 'Caixa inexistente ou já fechado.' });
         res.json({ success: true });
     } catch (error) {
         console.error('Erro ao fechar caixa:', error);
@@ -279,7 +230,7 @@ app.get('/api/clientes', async (req, res) => {
 app.post('/api/clientes', async (req, res) => {
     try {
         const { nome, telefone, limite_credito } = req.body;
-        if (!nome) {
+        if (typeof nome !== 'string' || !nome.trim() || nome.trim().length > 150 || !ehNumeroPositivo(limite_credito ?? 0)) {
             return res.status(400).json({ erro: 'O nome do cliente é obrigatório.' });
         }
         const query = 'INSERT INTO clientes (nome, telefone, limite_credito) VALUES (?, ?, ?)';
@@ -293,7 +244,6 @@ app.post('/api/clientes', async (req, res) => {
 
 // Buscar compras pendentes (crediário) de um cliente específico com todos os campos da venda e itens detalhados
 app.get('/api/clientes/:id/crediarios', async (req, res) => {
-    console.log("🚨 ATENÇÃO: A NOVA ROTA DE CREDIARIOS FOI CHAMADA!");
     try {
         const clienteId = req.params.id;
         const query = `
@@ -310,7 +260,6 @@ app.get('/api/clientes/:id/crediarios', async (req, res) => {
             ORDER BY v.criado_em DESC
         `;
         const [results] = await db.query(query, [clienteId]);
-        console.log("📦 Dados gerados com JOIN:", results);
         res.json(results);
     } catch (err) {
         console.error('❌ Erro na query de crediários:', err);
@@ -410,7 +359,9 @@ app.get('/relatorios/mais-vendidos', async (req, res) => {
 app.post('/login', async (req, res) => {
     try {
         const { nome, email, senha } = req.body;
-        const identificador = (nome || email || '').trim();
+        const entrada = nome || email;
+        if (typeof entrada !== 'string' || typeof senha !== 'string') return res.status(400).json({ error: 'Preencha os campos corretamente.' });
+        const identificador = entrada.trim();
 
         if (!identificador || !senha) {
             return res.status(400).json({ error: 'Preencha todos os campos.' });
@@ -421,7 +372,7 @@ app.post('/login', async (req, res) => {
             [identificador, identificador]
         );
 
-        if (rows.length === 0) {
+        if (rows.length === 0 || !rows[0].ativo) {
             return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
         }
 
@@ -481,6 +432,8 @@ app.put('/produtos/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { codigo_barras, nome, categoria_id, preco_custo, preco_venda, estoque_atual } = req.body;
+        const erros = validarProduto(req.body);
+        if (erros.length) return res.status(400).json({ erro: erros.join(' ') });
 
         const [result] = await db.query(
             `UPDATE produtos SET codigo_barras = ?, nome = ?, categoria_id = ?, preco_custo = ?, preco_venda = ?, estoque_atual = ? WHERE id = ?`,
@@ -492,6 +445,7 @@ app.put('/produtos/:id', async (req, res) => {
         }
         res.json({ mensagem: 'Produto atualizado com sucesso!' });
     } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ erro: 'Código de barras já cadastrado.' });
         console.error('Erro ao atualizar produto:', error);
         res.status(500).json({ erro: 'Erro ao atualizar produto.' });
     }
@@ -499,6 +453,7 @@ app.put('/produtos/:id', async (req, res) => {
 
 // Iniciar Servidor
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '127.0.0.1', () => {
+if (require.main === module) app.listen(PORT, '127.0.0.1', () => {
     console.log(`Servidor local em http://127.0.0.1:${PORT}`);
 });
+module.exports = app;

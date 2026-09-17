@@ -8,7 +8,7 @@
 //   node scripts/migrar-senhas.js
 
 require('dotenv').config();
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const db = require('../db');
 
 async function migrar() {

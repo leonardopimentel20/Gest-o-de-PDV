@@ -15,7 +15,7 @@ function verificarToken(req, res, next) {
 
     jwt.verify(token, process.env.JWT_SECRET, (err, usuario) => {
         if (err) {
-            return res.status(403).json({ error: 'Sessão expirada ou inválida. Faça login novamente.' });
+            return res.status(401).json({ error: 'Sessão expirada ou inválida. Faça login novamente.' });
         }
         req.usuario = usuario; // { id, nome, cargo }
         next();
