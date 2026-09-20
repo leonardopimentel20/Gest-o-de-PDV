@@ -118,6 +118,7 @@
             color: #475569;
         }
     </style>
+    <link rel="stylesheet" href="/css/responsivo.css">
 </head>
 
 <body>
@@ -164,7 +165,7 @@
                 oninput="filtrarClientes()" style="width: 320px;">
         </div>
 
-        <table>
+        <div class="table-scroll" role="region" aria-label="Tabela com rolagem horizontal" tabindex="0"><table>
             <thead>
                 <tr>
                     <th>ID</th>
@@ -177,7 +178,7 @@
                 </tr>
             </thead>
             <tbody id="tabelaClientes"></tbody>
-        </table>
+        </table></div>
     </div>
 
     <!-- Modal de Extrato e WhatsApp -->

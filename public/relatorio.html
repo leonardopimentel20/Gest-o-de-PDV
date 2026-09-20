@@ -212,6 +212,7 @@
         }
     </style>
     <link rel="stylesheet" href="/css/relatorios.css">
+    <link rel="stylesheet" href="/css/responsivo.css">
 </head>
 
 <body>
@@ -296,7 +297,7 @@
                 </div>
             </div>
 
-            <table>
+            <div class="table-scroll" role="region" aria-label="Tabela com rolagem horizontal" tabindex="0"><table>
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -307,7 +308,7 @@
                     </tr>
                 </thead>
                 <tbody id="tabelaVendasRelatorio"></tbody>
-            </table>
+            </table></div>
             <div id="totalVendasFiltradas"
                 style="display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 15px; padding: 14px 12px; border-top: 2px solid #1e3a8a; background: #eff6ff; color: #1e3a8a; font-weight: bold;">
                 <span id="rotuloTotalVendasFiltradas">Total das vendas exibidas:</span>
@@ -318,7 +319,7 @@
         <!-- Seção 2: Caixas -->
         <div id="secaoCaixas" class="relatorio-section">
             <h2>Conferência de Aberturas e Fechamentos de Caixa</h2>
-            <table>
+            <div class="table-scroll" role="region" aria-label="Tabela com rolagem horizontal" tabindex="0"><table>
                 <thead>
                     <tr>
                         <th>ID Sessão</th>
@@ -331,7 +332,7 @@
                     </tr>
                 </thead>
                 <tbody id="tabelaCaixasRelatorio"></tbody>
-            </table>
+            </table></div>
         </div>
 
         <!-- Seção 3: Estoque Baixo -->
@@ -341,7 +342,7 @@
                 <button type="button" class="btn-whats" onclick="enviarAlertaEstoqueWhatsApp()">📲 Pedir Reposição no
                     WhatsApp</button>
             </div>
-            <table>
+            <div class="table-scroll" role="region" aria-label="Tabela com rolagem horizontal" tabindex="0"><table>
                 <thead>
                     <tr>
                         <th>Código</th>
@@ -352,13 +353,13 @@
                     </tr>
                 </thead>
                 <tbody id="tabelaEstoqueBaixo"></tbody>
-            </table>
+            </table></div>
         </div>
 
         <!-- Seção 4: Mais Vendidos -->
         <div id="secaoMaisVendidos" class="relatorio-section">
             <h2>Ranking de Produtos Mais Vendidos</h2>
-            <table>
+            <div class="table-scroll" role="region" aria-label="Tabela com rolagem horizontal" tabindex="0"><table>
                 <thead>
                     <tr>
                         <th>Posição</th>
@@ -369,7 +370,7 @@
                     </tr>
                 </thead>
                 <tbody id="tabelaMaisVendidos"></tbody>
-            </table>
+            </table></div>
         </div>
         <!-- Seção 5: Sugestão de Compras -->
         <div id="secaoCompras" class="relatorio-section">
@@ -394,7 +395,7 @@
                 </select>
                 <button type="button" class="btn-filter" onclick="adicionarItemManual()">➕ Adicionar Item</button>
             </div>
-            <table>
+            <div class="table-scroll" role="region" aria-label="Tabela com rolagem horizontal" tabindex="0"><table>
                 <thead>
                     <tr>
                         <th>Código</th>
@@ -405,7 +406,7 @@
                     </tr>
                 </thead>
                 <tbody id="tabelaSugestaoCompras"></tbody>
-            </table>
+            </table></div>
         </div>
     </div>
     <script>

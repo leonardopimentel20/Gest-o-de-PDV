@@ -1,0 +1,56 @@
+/* Carregado depois dos estilos de cada tela. */
+.table-scroll { max-width: 100%; overflow-x: auto; }
+@media screen and (max-width: 1100px) {
+    header { flex-wrap: wrap; gap: 12px; }
+    header > div { min-width: 0; flex-wrap: wrap; }
+    .nav-links { flex-wrap: wrap; }
+}
+@media screen and (max-width: 900px) {
+    body.pagina-pdv { height: auto; min-height: 100vh; overflow: visible; }
+    .main-container { grid-template-columns: minmax(0, 1fr); overflow: visible; padding: 12px; gap: 16px; }
+    .main-container .card { min-width: 0; }
+    .main-container .table-responsive { flex: none; max-height: 50vh; overflow: auto; }
+}
+@media screen and (max-width: 768px) {
+    header { padding: 16px; align-items: flex-start; }
+    header h1 { font-size: 1.2rem; overflow-wrap: anywhere; }
+    .nav-links { width: 100%; gap: 4px; }
+    .nav-links a { display: flex; align-items: center; min-height: 44px; padding: 8px 10px; }
+    .container { margin: 16px auto; width: calc(100% - 24px); padding: 16px; }
+    .card { padding: 16px; }
+    .form-grid { grid-template-columns: minmax(0, 1fr); }
+    .form-group, .filter-bar > *, .resumo-cards > div { min-width: 0; }
+    input, select, textarea { min-width: 0; max-width: 100%; font-size: 16px !important; }
+    button, .btn, input:not([type="hidden"]), select { min-height: 44px; }
+    button { white-space: normal; }
+    h2 { font-size: 1.3rem; }
+    h2, h3, .summary-line, .resumo-cards { overflow-wrap: anywhere; }
+    .table-scroll table, .table-responsive table { min-width: 620px; }
+    .table-scroll:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+    .links-uteis { flex-direction: column; gap: 12px; }
+    .links-uteis a { padding: 8px 0; }
+    .summary-line { flex-wrap: wrap; gap: 8px; }
+    .resumo-cards { grid-template-columns: minmax(0, 1fr); }
+    .filter-bar { align-items: stretch; }
+    .filter-bar > input, .filter-bar > button { width: 100%; }
+    .submenu-tabs { gap: 8px; }
+    .submenu-tabs .tab-btn { flex: 1 1 130px; }
+    .relatorio-section > div:first-child { flex-wrap: wrap; gap: 12px; }
+    #manualNome { min-width: 0 !important; flex-basis: 100% !important; }
+    #modalAvulso, #modalExtrato, #modalAlerta { padding: 12px; }
+    #modalAvulso > div, #modalExtrato > div, #modalAlerta > div {
+        max-width: 100%; max-height: calc(100dvh - 24px); overflow-y: auto;
+        padding: 20px !important; overflow-wrap: anywhere;
+    }
+    .pagina-login { height: auto; min-height: 100vh; min-height: 100dvh; padding: 24px 16px; }
+    .pagina-login > form { width: 100%; max-width: 400px; margin: auto; }
+    .login-card { padding: 24px; }
+    .password-container button { right: 0; min-width: 44px; }
+}
+@media screen and (max-width: 480px) {
+    .search-box { flex-wrap: wrap; }
+    .search-box input { flex-basis: 100%; margin-bottom: 0; }
+    .search-box .btn { width: 100% !important; }
+    .search-box .suggestions-dropdown { top: 44px; right: 0; }
+}
+@media print { .table-scroll { overflow: visible; } }

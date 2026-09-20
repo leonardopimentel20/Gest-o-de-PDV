@@ -118,6 +118,7 @@
             color: #475569;
         }
     </style>
+    <link rel="stylesheet" href="/css/responsivo.css">
 </head>
 
 <body>
@@ -177,7 +178,7 @@
                 oninput="filtrarTabelaProdutos(this.value)"
                 style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem;">
         </div>
-        <table>
+        <div class="table-scroll" role="region" aria-label="Tabela com rolagem horizontal" tabindex="0"><table>
             <thead>
                 <tr>
                     <th>ID</th>
@@ -190,7 +191,7 @@
                 </tr>
             </thead>
             <tbody id="tabelaProdutos"></tbody>
-        </table>
+        </table></div>
     </div>
     <script>
         const API_URL = window.location.origin;

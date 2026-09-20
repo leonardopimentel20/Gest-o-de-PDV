@@ -1,6 +1,6 @@
 # Gestão de PDV
 
-Sistema de ponto de venda para pequenos comércios, com interface web e execução local. Desenvolvido com Node.js, Express e MySQL/MariaDB.
+Sistema de ponto de venda para pequenos comércios, com interface web, execução local ou em Docker e hospedagem na Railway. Desenvolvido com Node.js, Express e MySQL/MariaDB.
 
 ## Funcionalidades
 
@@ -36,7 +36,37 @@ Requisitos: Node.js compatível com o executor nativo de testes (a revisão foi 
 
 No Windows, execute **iniciar.vbs** ou crie um atalho para ele. O inicializador localiza a pasta, aguarda o servidor e o banco e abre o navegador. Se a mesma instância já estiver disponível, ela é reutilizada. Erros de inicialização ficam na pasta `logs/`.
 
-O servidor escuta apenas na interface local. Esta configuração não publica o sistema na internet.
+Com `HOST=127.0.0.1`, o servidor escuta apenas na interface local. Em contêineres, use `HOST=0.0.0.0`.
+
+## Docker e Railway
+
+O `Dockerfile` existente constrói a aplicação com `node:18-alpine`, instala as dependências e executa `npm start`. O banco é configurado pelas variáveis `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` e `DB_NAME`; ele não faz parte da imagem da aplicação.
+
+Para construir e executar com um banco já existente:
+
+```sh
+docker build -t gestao-pdv .
+docker run --name gestao-pdv --env-file .env -e HOST=0.0.0.0 -e PORT=3000 -p 3000:3000 -d gestao-pdv
+docker logs -f gestao-pdv
+```
+
+Configure uma `JWT_SECRET` própria no `.env`. Dentro do contêiner, `127.0.0.1` aponta para o próprio contêiner: use o endereço acessível do banco em `DB_HOST` (no Docker Desktop, `host.docker.internal` para um banco no computador). Acesse `http://localhost:3000/login.html`.
+
+O `docker-compose.yml` inclui a aplicação e um MariaDB com volume persistente `db_data`. Antes de usá-lo, substitua os valores de exemplo de usuário, senha e banco nos dois serviços e acrescente `HOST=0.0.0.0`, `PORT=3000` e `JWT_SECRET=${JWT_SECRET}` ao `environment` do serviço `app`. Defina essa chave no `.env`. Então execute:
+
+```sh
+docker compose up -d --build
+docker compose logs -f app
+docker compose down
+```
+
+O Compose publica a aplicação na porta `3000` e o banco na porta `3307` do computador; entre os serviços, a aplicação usa `db:3306`. O volume preserva o banco ao recriar contêineres. `docker compose down -v` remove esse volume e seus dados. Ainda é necessário importar a estrutura e os dados compatíveis: o Compose não cria as tabelas do PDV.
+
+Na Railway, a implantação usa o `Dockerfile` do repositório. Configure as variáveis de banco e `JWT_SECRET` no serviço, use `HOST=0.0.0.0` e mantenha a porta do processo alinhada à porta de destino do domínio (`PORT`). O endereço do banco deve ser acessível pelo serviço da aplicação. Para publicar alterações de interface, envie o commit para a branch conectada e faça uma nova implantação da imagem.
+
+## Uso no celular
+
+As seis telas carregam `public/css/responsivo.css`: menus quebram linha, formulários ficam em uma coluna e a frente de caixa permite rolagem vertical em telas menores. Tabelas largas têm rolagem horizontal própria, preservando todas as colunas. Login e janelas de diálogo se ajustam à largura disponível. As regras de celular são limitadas à mídia de tela para preservar a impressão dos relatórios.
 
 ## Testes e verificação
 
@@ -80,4 +110,4 @@ O [guia do cliente](LEIA-ME-CLIENTE.md) explica a preservação do banco, os fil
 
 - A prevenção de clique duplo cobre requisições simultâneas na mesma tela. Após uma queda de conexão, confira o histórico antes de reenviar uma venda.
 - A conferência de caixa mantém a regra de abertura mais todas as vendas, incluindo pagamentos eletrônicos e crediário; não representa apenas o dinheiro físico na gaveta.
-- A revisão não inclui integração fiscal, processamento de pagamentos ou implantação em nuvem.
+- A revisão não inclui integração fiscal ou processamento de pagamentos.
