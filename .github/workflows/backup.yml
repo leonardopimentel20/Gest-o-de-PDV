@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: '0 3 * * 0' # Executa todos os domingos às 03:00 UTC
   workflow_dispatch: # Permite executar manualmente pelo GitHub
+  permissions:
+    contents: write # Permite gravar no repositório
 
 jobs:
   backup:
