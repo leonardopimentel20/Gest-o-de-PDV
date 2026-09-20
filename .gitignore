@@ -16,3 +16,12 @@ validacao-backup/
 *.bak
 .env.*
 !.env.example
+
+# Scripts locais e atalhos de automação
+backup-agora.cmd
+iniciar.vbs
+
+# Documentações locais e de clientes
+LEIA-ME-CLIENTE.md
+ATUALIZACAO.md
+README.md
