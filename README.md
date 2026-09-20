@@ -46,7 +46,7 @@ npm test
 
 A suíte usa um banco simulado e não altera o MySQL. Cobre autenticação, validação de entradas, transações, estoque insuficiente, caixa fechado, limite de crédito, itens avulsos e prevenção de envios simultâneos na tela.
 
-Com o servidor iniciado, execute as verificações de leitura:
+Para conferir as rotas e o banco configurado, execute as verificações de leitura (o script abre e encerra uma instância temporária em porta livre):
 
 ```sh
 node scripts/verificar-leitura.js
@@ -71,6 +71,10 @@ Os utilitários de geração de hash e migração de senhas são ferramentas adm
 ## Atualização de uma instalação
 
 Consulte [ATUALIZACAO.md](ATUALIZACAO.md) para o procedimento de backup, instalação e retorno à versão anterior. Preserve o `.env` do cliente. Credenciais, banco, dependências instaladas, logs e pacotes locais não são versionados.
+
+Para montar a pasta de transferência no Windows, execute `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\gerar-entrega.ps1`. A pasta `PDV-CLIENTE` é criada ao lado do projeto, com os arquivos necessários e dependências, sem `.env`, dados, testes ou ferramentas administrativas de limpeza/migração. O gerador recusa sobrescrever uma entrega existente.
+
+O [guia do cliente](LEIA-ME-CLIENTE.md) explica a preservação do banco, os filtros de relatórios e a configuração opcional de backups automáticos. O backup não é ativado até que `BACKUP_DIR` seja definido no `.env`.
 
 ## Limites conhecidos
 

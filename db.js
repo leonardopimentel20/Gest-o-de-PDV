@@ -1,16 +1,20 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'loja_variedades',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+const { configuracao } = require('./utils/configuracao');
+const config = configuracao();
+const pool = mysql.createPool(config.banco);
+if (config.fuso !== 'local') {
+    // Enfileirada antes de entregar a conexão: NOW() e as datas do driver usam o mesmo fuso.
+    pool.on('connection', connection => {
+        connection.query('SET time_zone = ?', [config.fuso], error => {
+            if (error) {
+                console.error('Não foi possível configurar o fuso horário da conexão.');
+                connection.destroy();
+            }
+        });
+    });
+}
 
 // Testa a conexão ao iniciar sem derrubar a aplicação
 pool.getConnection()

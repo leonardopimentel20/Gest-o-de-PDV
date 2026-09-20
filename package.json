@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/regressao.test.js"
+    "test": "node --test tests/*.test.js",
+    "backup": "node scripts/backup-banco.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

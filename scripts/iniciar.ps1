@@ -16,6 +16,8 @@ $sha.Dispose()
 $mutex = New-Object System.Threading.Mutex($false, "Local\LojaSistemaPDV$porta")
 $adquiriu = $false
 try {
+    if (!(Test-Path -LiteralPath $envArquivo)) { throw 'Arquivo .env ausente. Copie o .env da instalacao do cliente para esta pasta antes de abrir o PDV.' }
+    if (!(Test-Path -LiteralPath (Join-Path $raiz 'node_modules\express\package.json'))) { throw 'Dependencias ausentes. Execute npm.cmd ci na pasta do sistema.' }
     $adquiriu = $mutex.WaitOne(60000)
     if (!$adquiriu) { throw 'Outra inicializacao ainda esta em andamento. Aguarde e tente novamente.' }
     $pronto = $false

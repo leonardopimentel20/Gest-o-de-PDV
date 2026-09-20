@@ -4,3 +4,15 @@ node_modules/
 
 logs/
 entregas/
+
+# Backups e dados locais nunca devem ser versionados.
+backups/
+validacao-backup/
+*.sql
+*.sql.gz
+*.partial
+*.sqlite
+*.sqlite3
+*.bak
+.env.*
+!.env.example

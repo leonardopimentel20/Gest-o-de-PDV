@@ -7,6 +7,7 @@ const path = require('path');
 const { verificarToken } = require('./middleware/auth');
 const { validarProduto, validarItensVenda, ehNumeroPositivo, ehInteiroPositivo } = require('./utils/validacao');
 const app = express();
+const backup = require('./utils/backup');
 app.use(express.json());
 app.disable('x-powered-by');
 app.use(express.static(path.join(__dirname, 'public')));
@@ -18,6 +19,10 @@ app.get('/health', async (req, res) => {
     } catch { res.status(503).json({ erro: 'Banco de dados indisponível.' }); }
 });
 app.use((req, res, next) => req.path === '/login' && req.method === 'POST' ? next() : verificarToken(req, res, next));
+app.get('/backup/status', (req, res) => {
+    const { configurado, executando, ultimoSucesso, erro } = backup.estado;
+    res.json({ configurado, executando, ultimoSucesso, falha: Boolean(erro) });
+});
 
 // 1. Rota para Listar Produtos corrigida para retornar os dados corretamente
 app.get('/produtos', async (req, res) => {
@@ -131,7 +136,9 @@ app.post('/vendas', async (req, res) => {
 app.get('/vendas', async (req, res) => {
     try {
         const [rows] = await db.query(`
-            SELECT v.*, c.nome as cliente_nome 
+            SELECT v.*, c.nome as cliente_nome,
+                   DATE_FORMAT(v.criado_em, '%Y-%m-%d') AS data_local,
+                   DATE_FORMAT(v.criado_em, '%d/%m/%Y %H:%i:%s') AS data_exibicao
             FROM vendas v 
             LEFT JOIN clientes c ON v.cliente_id = c.id 
             ORDER BY v.id DESC
@@ -452,8 +459,11 @@ app.put('/produtos/:id', async (req, res) => {
 });
 
 // Iniciar Servidor
-const PORT = process.env.PORT || 3000;
-if (require.main === module) app.listen(PORT, '127.0.0.1', () => {
-    console.log(`Servidor local em http://127.0.0.1:${PORT}`);
-});
+if (require.main === module) {
+    const config = require('./utils/configuracao').configuracao();
+    app.listen(config.port, config.host, () => {
+        backup.iniciarBackups(db);
+        console.log(`Servidor iniciado em ${config.host}:${config.port}`);
+    });
+}
 module.exports = app;

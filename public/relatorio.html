@@ -3,6 +3,8 @@
 
 <head>
     <script src="/js/sessao.js"></script>
+    <script src="/js/periodos.js"></script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Relatórios - Loja de Variedades</title>
@@ -209,6 +211,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="/css/relatorios.css">
 </head>
 
 <body>
@@ -229,6 +232,7 @@
     </header>
 
     <div class="container">
+        <p id="statusBackup" class="orientacao" role="status">Consultando situação do backup…</p>
         <!-- Sub-menu Interno com Abas -->
         <div class="submenu-tabs">
             <button class="tab-btn active" onclick="trocarAba('vendas', this)">Relatório de Vendas</button>
@@ -242,7 +246,8 @@
         <!-- Seção 1: Vendas -->
         <div id="secaoVendas" class="relatorio-section active">
             <h2>Histórico de Vendas</h2>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+            <p class="orientacao">A semana vai de segunda a domingo. O total reinicia automaticamente na segunda, mantendo o histórico de vendas.</p>
+            <div class="resumo-cards">
                 <div
                     style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #059669; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                     <h4 id="rotuloTotalDia" style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Total Hoje
@@ -251,7 +256,7 @@
                 </div>
                 <div
                     style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <h4 style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Total da Semana</h4>
+                    <h4 style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Semana atual · seg. a dom.</h4>
                     <p id="totalSemana" style="font-size: 1.25rem; font-weight: bold; color: #2563eb;">R$ 0,00</p>
                 </div>
                 <div
@@ -260,12 +265,23 @@
                     <p id="totalMes" style="font-size: 1.25rem; font-weight: bold; color: #7c3aed;">R$ 0,00</p>
                 </div>
             </div>
+            <div class="atalhos-periodo" aria-label="Períodos rápidos">
+                <button onclick="carregarTodosRelatorios()">Atualizar dados</button>
+                <button onclick="selecionarPeriodo('hoje')">Hoje</button>
+                <button onclick="selecionarPeriodo('ontem')">Ontem</button>
+                <button onclick="selecionarPeriodo('semana')">Esta semana</button>
+                <button onclick="selecionarPeriodo('anterior')">Semana passada</button>
+                <button onclick="selecionarPeriodo('mes')">Este mês</button>
+            </div>
+            <p id="periodoExibido" class="orientacao" aria-live="polite"></p>
+            <p id="erroVendas" role="alert" hidden></p>
             <div class="filter-bar">
-                <label>Data:</label>
-                <input type="date" id="filtroData">
-                <button class="btn-filter" onclick="renderizarTabelaVendas()">Filtrar Data</button>
-                <button class="badge-pag" style="background:#64748b; color:white;" onclick="limparFiltroData()">Limpar
-                    Data</button>
+                <label for="filtroData">De:</label>
+                <input type="date" id="filtroData" onchange="renderizarTabelaVendas()">
+                <label for="filtroDataFim">Até:</label>
+                <input type="date" id="filtroDataFim" onchange="renderizarTabelaVendas()">
+                <button class="btn-filter" onclick="renderizarTabelaVendas()">Aplicar</button>
+                <button class="badge-pag" style="background:#64748b; color:white;" onclick="limparFiltroData()">Todo o histórico</button>
                 <button class="btn-filter" style="background-color: #dc2626;" onclick="exportarPDF()">📥 Baixar
                     PDF</button>
                 <button class="btn-whats" onclick="enviarRelatorioWhatsApp()">📲 Enviar no WhatsApp</button>
@@ -416,6 +432,23 @@
             return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         }
 
+        async function atualizarStatusBackup() {
+            const elemento = document.getElementById('statusBackup');
+            try {
+                const resposta = await fetch(`${API_URL}/backup/status`);
+                if (!resposta.ok) throw new Error();
+                const status = await resposta.json();
+                elemento.innerText = !status.configurado ? 'Backup automático não configurado. Solicite a configuração de uma pasta de cópias de segurança.' :
+                    status.falha ? 'Atenção: o último backup falhou. Confira logs/erros.log e a pasta de destino.' :
+                    status.executando ? 'Backup em andamento…' :
+                    status.ultimoSucesso ? 'Último backup nesta execução: ' + new Date(status.ultimoSucesso).toLocaleString('pt-BR') : 'Aguardando o primeiro backup.';
+                elemento.classList.toggle('aviso-backup', !status.configurado || status.falha);
+            } catch {
+                elemento.innerText = 'Não foi possível consultar a situação do backup.';
+                elemento.classList.add('aviso-backup');
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', async () => {
             const token = localStorage.getItem('token');
             const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
@@ -434,9 +467,14 @@
                     }
                 });
 
-                trocarAba('estoque', document.querySelector('.tab-btn:nth-child(5)')); // Foca na aba de compras/estoque
+                trocarAba('compras', document.querySelector('.tab-btn:nth-child(5)')); // Foca na aba de compras/estoque
             }            // Não preenchemos a data automaticamente no carregamento para exibir todas as vendas de início
             await carregarTodosRelatorios();
+            await atualizarStatusBackup();
+            setInterval(() => {
+                if (document.getElementById('erroVendas').hidden) renderizarTabelaVendas();
+                atualizarStatusBackup();
+            }, 60000);
         });
 
         function trocarAba(aba, elemento) {
@@ -452,59 +490,46 @@
         }
 
         function calcularTotaisResumo(vendas) {
-            let totalDia = 0;
-            let totalSemana = 0;
-            let totalMes = 0;
+            const totais = Periodos.totais(vendas);
+            document.getElementById('totalDia').innerText = formatarMoeda(totais.dia);
+            document.getElementById('totalSemana').innerText = formatarMoeda(totais.semana);
+            document.getElementById('totalMes').innerText = formatarMoeda(totais.mes);
+        }
 
+        function selecionarPeriodo(tipo) {
             const agora = new Date();
-            const ano = agora.getFullYear();
-            const mes = String(agora.getMonth() + 1).padStart(2, '0');
-            const dia = String(agora.getDate()).padStart(2, '0');
-            const hojeStr = `${ano}-${mes}-${dia}`;
-            const mesAtual = agora.getMonth();
-            const anoAtual = agora.getFullYear();
-
-            vendas.forEach(v => {
-                if (!v.criado_em) return;
-                const valor = Number(v.valor_total) || 0;
-                const dataStr = v.criado_em.substring(0, 10);
-
-                // Total do Dia (Hoje)
-                if (dataStr === hojeStr) {
-                    totalDia += valor;
-                }
-
-                const dataVendaObj = new Date(v.criado_em);
-                if (!isNaN(dataVendaObj)) {
-                    // Total do Mês Atual
-                    if (dataVendaObj.getMonth() === mesAtual && dataVendaObj.getFullYear() === anoAtual) {
-                        totalMes += valor;
-                    }
-
-                    // Total da Semana (últimos 7 dias)
-                    const diffTime = agora - dataVendaObj;
-                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-                    if (diffDays >= 0 && diffDays <= 7) {
-                        totalSemana += valor;
-                    }
-                }
-            });
-
-            document.getElementById('totalDia').innerText = formatarMoeda(totalDia);
-            document.getElementById('totalSemana').innerText = formatarMoeda(totalSemana);
-            document.getElementById('totalMes').innerText = formatarMoeda(totalMes);
+            let inicio = Periodos.chave(agora), fim = inicio;
+            if (tipo === 'ontem') {
+                agora.setDate(agora.getDate() - 1);
+                inicio = fim = Periodos.chave(agora);
+            } else if (tipo === 'semana' || tipo === 'anterior') {
+                if (tipo === 'anterior') agora.setDate(agora.getDate() - 7);
+                ({ inicio, fim } = Periodos.semana(agora));
+            } else if (tipo === 'mes') {
+                inicio = Periodos.chave(new Date(agora.getFullYear(), agora.getMonth(), 1));
+                fim = Periodos.chave(new Date(agora.getFullYear(), agora.getMonth() + 1, 0));
+            }
+            document.getElementById('filtroData').value = inicio;
+            document.getElementById('filtroDataFim').value = fim;
+            renderizarTabelaVendas();
         }
 
         async function carregarTodosRelatorios() {
             // 1. Carregar Vendas
             try {
                 const resVendas = await fetch(`${API_URL}/vendas`);
+                if (!resVendas.ok) throw new Error('Falha ao consultar vendas');
                 const dadosVendas = await resVendas.json();
+                if (!Array.isArray(dadosVendas.vendas)) throw new Error('Resposta inválida');
+                document.getElementById('erroVendas').hidden = true;
                 vendasGlobal = dadosVendas.vendas;
                 calcularTotaisResumo(vendasGlobal);
                 renderizarTabelaVendas();
             } catch (error) {
                 console.error('Erro ao carregar relatório de vendas:', error);
+                document.getElementById('erroVendas').hidden = false;
+                document.getElementById('erroVendas').innerText = 'Não foi possível carregar as vendas. Atualize a página para tentar novamente.';
+                ['totalDia', 'totalSemana', 'totalMes', 'valorTotalVendasFiltradas'].forEach(id => document.getElementById(id).innerText = 'Indisponível');
             }
 
             // 2. Carregar Caixas
@@ -607,40 +632,27 @@
 
         function limparFiltroData() {
             document.getElementById('filtroData').value = '';
+            document.getElementById('filtroDataFim').value = '';
             renderizarTabelaVendas();
         }
 
         function renderizarTabelaVendas() {
             const dataFiltro = document.getElementById('filtroData').value;
+            const dataFim = document.getElementById('filtroDataFim').value || dataFiltro;
             const tbody = document.getElementById('tabelaVendasRelatorio');
+            const aviso = document.getElementById('periodoExibido');
+            const formatarData = data => data.split('-').reverse().join('/');
+            const invalido = dataFiltro && dataFim && dataFiltro > dataFim;
+            aviso.innerText = invalido ? 'A data inicial deve ser anterior ou igual à final.' :
+                (dataFiltro || dataFim ? 'Período: ' + (dataFiltro ? formatarData(dataFiltro) : 'início') + ' até ' + formatarData(dataFim) : 'Todo o histórico') +
+                ' · Pagamento: ' + pagamentoAtual.replaceAll('_', ' ') + '. Os cartões mostram os totais atuais de todas as formas de pagamento.';
+            const filtradas = invalido ? [] : Periodos.filtrar(vendasGlobal, dataFiltro, dataFim, pagamentoAtual);
             tbody.innerHTML = '';
-
-            document.getElementById('rotuloTotalVendasFiltradas').innerText = dataFiltro
-                ? 'Total do dia selecionado:'
-                : 'Total das vendas exibidas:';
-
-            document.getElementById('rotuloTotalDia').innerText = dataFiltro
-                ? 'Total do Dia Selecionado'
-                : 'Total Hoje (Dia)';
-
-            let filtradas = vendasGlobal.filter(v => {
-                let matchPag = (pagamentoAtual === 'todos' || v.forma_pagamento === pagamentoAtual);
-                let matchData = true;
-                if (dataFiltro && v.criado_em) {
-                    const dataVendaStr = v.criado_em.substring(0, 10);
-                    matchData = (dataVendaStr === dataFiltro);
-                }
-                return matchPag && matchData;
-            });
-
-            const totalFiltrado = filtradas.reduce((total, venda) => total + (Number(venda.valor_total) || 0), 0);
+            document.getElementById('rotuloTotalDia').innerText = 'Hoje';
+            document.getElementById('rotuloTotalVendasFiltradas').innerText = filtradas.length + ' venda(s) · Total exibido:';
+            const totalFiltrado = filtradas.reduce((total, v) => total + Math.round((Number(v.valor_total) || 0) * 100), 0) / 100;
             document.getElementById('valorTotalVendasFiltradas').innerText = formatarMoeda(totalFiltrado);
-
-            if (dataFiltro) {
-                document.getElementById('totalDia').innerText = formatarMoeda(totalFiltrado);
-            } else {
-                calcularTotaisResumo(vendasGlobal);
-            }
+            calcularTotaisResumo(vendasGlobal);
 
             if (filtradas.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#64748b;">Nenhuma venda encontrada para os filtros selecionados.</td></tr>';
@@ -648,7 +660,7 @@
             }
 
             filtradas.forEach(v => {
-                const dataFormatada = v.criado_em ? new Date(v.criado_em).toLocaleString('pt-BR') : '-';
+                const dataFormatada = v.data_exibicao || (v.criado_em ? new Date(v.criado_em).toLocaleString('pt-BR') : '-');
                 tbody.innerHTML += `
                     <tr>
                         <td>#${v.id}</td>
@@ -674,19 +686,10 @@
             const totalDia = document.getElementById('totalDia').innerText;
             const totalSemana = document.getElementById('totalSemana').innerText;
             const totalMes = document.getElementById('totalMes').innerText;
-            const dataFiltro = document.getElementById('filtroData').value;
-            let rotuloTotalDia = 'Total Hoje (Dia)';
-
-            if (dataFiltro) {
-                const [ano, mes, dia] = dataFiltro.split('-');
-                rotuloTotalDia = `Total do Dia (${dia}/${mes}/${ano})`;
-            }
-
-            let msg = `📊 *RESUMO DO RELATÓRIO DE VENDAS* 📊\n\n`;
-            msg += `• *${rotuloTotalDia}:* ${totalDia}\n`;
-            msg += `• *Total da Semana:* ${totalSemana}\n`;
-            msg += `• *Total do Mês:* ${totalMes}\n\n`;
-            msg += `_Loja de Variedades - PDV_ ✨`;
+            let msg = '📊 *RESUMO DO RELATÓRIO DE VENDAS*\n\n';
+            msg += document.getElementById('periodoExibido').innerText + '\n';
+            msg += '*Total exibido:* ' + document.getElementById('valorTotalVendasFiltradas').innerText + '\n\n';
+            msg += '*Hoje:* ' + totalDia + '\n*Semana atual (seg. a dom.):* ' + totalSemana + '\n*Mês atual:* ' + totalMes;
 
             const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
             window.open(url, '_blank');
