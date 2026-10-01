@@ -19,8 +19,8 @@
             color: #1e293b;
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
 
         header {
@@ -76,13 +76,11 @@
             gap: 20px;
             padding: 20px;
             flex: 1;
-            overflow: hidden;
         }
 
         @media (max-width: 900px) {
             .main-container {
                 grid-template-columns: 1fr;
-                overflow-y: auto;
                 height: auto;
             }
         }
@@ -95,6 +93,8 @@
             display: flex;
             flex-direction: column;
             position: relative;
+            max-height: calc(100vh - 90px);
+            overflow-y: auto;
         }
 
         .search-box {
@@ -112,7 +112,6 @@
             font-size: 1rem;
         }
 
-        /* Caixa de Sugestões Flutuante */
         .suggestions-dropdown {
             position: absolute;
             top: 100%;
@@ -125,10 +124,6 @@
             overflow-y: auto;
             z-index: 1000;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .client-search-container .suggestions-dropdown {
-            right: 0;
         }
 
         .suggestion-item {
@@ -151,6 +146,7 @@
             border: 1px solid #e2e8f0;
             border-radius: 6px;
             margin-bottom: 15px;
+            max-height: 400px;
         }
 
         table {
@@ -229,10 +225,6 @@
         .btn-danger:hover {
             background-color: #b91c1c;
         }
-
-        .client-search-container {
-            position: relative;
-        }
     </style>
     <link rel="stylesheet" href="/css/responsivo.css">
 </head>
@@ -285,7 +277,7 @@
         </div>
 
         <!-- Lado Direito: Fechamento, Cliente e Pagamento -->
-        <div class="card" style="justify-content: space-between;">
+        <div class="card">
             <div>
                 <h3 style="margin-bottom: 15px; color: #1e3a8a;">Resumo da Venda</h3>
                 <div class="summary-line">
@@ -300,7 +292,7 @@
 
             <!-- Botão para acionar o Item Avulso -->
             <button type="button" onclick="abrirModalAvulso()"
-                style="background-color: #2563eb; margin-top: 10px; padding: 8px 14px; font-size: 0.85rem; border-radius: 6px; color: white; border: none; cursor: pointer; font-weight: bold;">+
+                style="background-color: #2563eb; margin-top: 10px; margin-bottom: 15px; padding: 8px 14px; font-size: 0.85rem; border-radius: 6px; color: white; border: none; cursor: pointer; font-weight: bold;">+
                 Item Avulso</button>
 
             <!-- Estrutura da Sub-janela (Modal) -->
@@ -340,12 +332,12 @@
             </div>
 
             <!-- Contêiner pai com position: relative correto para o campo de clientes -->
-            <div style="position: relative; margin-bottom: 15px; margin-top: 15px;">
+            <div style="position: relative; margin-bottom: 15px;">
                 <label
                     style="display: block; margin-bottom: 5px; font-weight: 600; color: #475569; font-size: 0.9rem;">Cliente
                     (Obrigatório para Crediário):</label>
                 <input type="text" id="buscaCliente" placeholder="Digite para buscar cliente..."
-                    oninput="filtrarClientes(this.value)" onkeydown="tratarTecladoClientes(event)" autocomplete="off"
+                    oninput="filtrarClientes(this.value)" autocomplete="off"
                     style="width: 100%; padding: 8px; box-sizing: border-box;">
 
                 <input type="hidden" id="cliente_id_selecionado">
@@ -367,12 +359,68 @@
                 <option value="crediario">Crediário (Fiado)</option>
             </select>
 
+            <!-- Bloco de Configuração do Crediário -->
+            <div id="blocoCrediario"
+                style="display: none; background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+                
+                <label style="font-size: 0.85rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Prazo de Vencimento:</label>
+                <div style="display: flex; gap: 5px; margin-bottom: 8px;">
+                    <button type="button" onclick="definirPrazoCrediario(7)"
+                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">7 dias</button>
+                    <button type="button" onclick="definirPrazoCrediario(14)"
+                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">14 dias</button>
+                    <button type="button" onclick="definirPrazoCrediario(21)"
+                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">21 dias</button>
+                    <button type="button" onclick="definirPrazoCrediario(28)"
+                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">28 dias</button>
+                </div>
+
+                <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Data de Vencimento / Acerto:</label>
+                <input type="date" id="credDataVencimento"
+                    style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+
+                <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Valor da Entrada (R$):</label>
+                <input type="number" id="credValorEntrada" step="0.01" placeholder="0.00" value="0.00"
+                    oninput="calcularCrediario()" style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+
+                <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Número de Parcelas:</label>
+                <select id="credQtdParcelas" onchange="calcularCrediario()"
+                    style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <option value="1">1x (Sem juros)</option>
+                    <option value="2">2x</option>
+                    <option value="3">3x</option>
+                    <option value="4">4x</option>
+                    <option value="5">5x</option>
+                    <option value="6">6x</option>
+                    <option value="10">10x</option>
+                    <option value="12">12x</option>
+                </select>
+
+                <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Tipo de Juros:</label>
+                <select id="credTipoJuros" onchange="calcularCrediario()"
+                    style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <option value="nenhum">Sem Juros</option>
+                    <option value="com_juros">Com Juros (% ao mês)</option>
+                </select>
+
+                <div id="divTaxaJuros" style="display: none; margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Taxa de Juros Mensal (%):</label>
+                    <input type="number" id="credTaxaJuros" step="0.01" placeholder="2.00" value="2.00"
+                        oninput="calcularCrediario()" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                </div>
+
+                <div id="resumoCrediario"
+                    style="font-size: 0.9rem; color: #334155; border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 5px;">
+                    <!-- Preenchido dinamicamente -->
+                </div>
+            </div>
+
             <button class="btn btn-success" onclick="finalizarVenda()"
-                style="font-size: 1.1rem; padding: 14px; width: 100%;">Finalizar Venda (F10)</button>
+                style="font-size: 1.1rem; padding: 14px; width: 100%; margin-top: auto;">Finalizar Venda (F10)</button>
         </div>
     </div>
+    
     <script>
-        // No início do script da página caixa.html:
         const token = localStorage.getItem('token');
         if (!token) {
             window.location.href = 'login.html';
@@ -398,10 +446,78 @@
 
             usuarioLogado = usuario;
 
-            // Chama a função com o nome correto que você definiu no script:
             await verificarCaixaAtivo();
             await carregarDadosIniciais();
+
+            const selectPagamento = document.getElementById('formaPagamento');
+            if (selectPagamento) {
+                selectPagamento.addEventListener('change', atualizarVisibilidadeCrediario);
+                atualizarVisibilidadeCrediario();
+            }
         });
+
+        function atualizarVisibilidadeCrediario() {
+            const formaPagamento = document.getElementById('formaPagamento').value;
+            const bloco = document.getElementById('blocoCrediario');
+
+            if (!bloco) return;
+
+            if (formaPagamento === 'crediario') {
+                bloco.style.display = 'block';
+                calcularCrediario();
+            } else {
+                bloco.style.display = 'none';
+            }
+        }
+
+        function calcularCrediario() {
+            const totalGeral = carrinho.reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0);
+            const entrada = parseFloat(document.getElementById('credValorEntrada').value) || 0;
+            const qtdParcelas = parseInt(document.getElementById('credQtdParcelas').value) || 1;
+            const tipoJuros = document.getElementById('credTipoJuros').value;
+            const divTaxa = document.getElementById('divTaxaJuros');
+
+            let taxaJuros = 0;
+            if (tipoJuros === 'com_juros') {
+                divTaxa.style.display = 'block';
+                taxaJuros = (parseFloat(document.getElementById('credTaxaJuros')?.value) || 0) / 100;
+            } else {
+                divTaxa.style.display = 'none';
+            }
+
+            let valorFinanciado = totalGeral - entrada;
+            if (valorFinanciado < 0) valorFinanciado = 0;
+
+            let valorTotalFinal = totalGeral;
+            let valorParcela = 0;
+
+            if (tipoJuros === 'com_juros' && taxaJuros > 0 && valorFinanciado > 0) {
+                const i = taxaJuros;
+                const n = qtdParcelas;
+                valorParcela = valorFinanciado * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
+                valorTotalFinal = entrada + (valorParcela * qtdParcelas);
+            } else {
+                valorParcela = qtdParcelas > 0 ? valorFinanciado / qtdParcelas : valorFinanciado;
+            }
+
+            const resumoEl = document.getElementById('resumoCrediario');
+            if (resumoEl) {
+                resumoEl.innerHTML = `
+                    <div>Financiado: <b>R$ ${valorFinanciado.toFixed(2)}</b></div>
+                    <div>Parcelas: <b>${qtdParcelas}x de R$ ${valorParcela.toFixed(2)}</b></div>
+                    <div>Total com Acréscimo: <b>R$ ${valorTotalFinal.toFixed(2)}</b></div>
+                `;
+            }
+        }
+
+        function definirPrazoCrediario(dias) {
+            const data = new Date();
+            data.setDate(data.getDate() + dias);
+            const ano = data.getFullYear();
+            const mes = String(data.getMonth() + 1).padStart(2, '0');
+            const dia = String(data.getDate()).padStart(2, '0');
+            document.getElementById('credDataVencimento').value = `${ano}-${mes}-${dia}`;
+        }
 
         async function verificarCaixaAtivo() {
             try {
@@ -440,20 +556,6 @@
             }
         }
 
-        async function carregarClientesPDV() {
-            try {
-                const res = await fetch(`${API_URL}/api/clientes`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const clientes = await res.json();
-                return clientes;
-            } catch (err) {
-                console.error('Erro ao carregar clientes para o PDV:', err);
-                return [];
-            }
-        }
-
-        // --- NAVEGAÇÃO POR TECLADO NAS SUGESTÕES ---
         function tratarTecladoBusca(e, dropdownId, acaoEnterPadrao) {
             const dropdown = document.getElementById(dropdownId);
             if (dropdown.style.display === 'none') {
@@ -496,87 +598,6 @@
             }
         }
 
-        // --- FILTRO E SUGESTÕES DE PRODUTOS ---
-        function tratarTecladoProdutos(e) {
-            const dropdown = document.getElementById('listaSugestoesProdutos');
-            if (dropdown.style.display === 'none') {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    adicionarPrimeiroProdutoLista();
-                }
-                return;
-            }
-
-            const items = dropdown.querySelectorAll('.suggestion-item');
-            if (items.length === 0) return;
-
-            let currentIndex = Array.from(items).findIndex(item => item.classList.contains('highlight'));
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                if (currentIndex < items.length - 1) currentIndex++;
-                else currentIndex = 0;
-                atualizarDestaqueItem(items, currentIndex);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                if (currentIndex > 0) currentIndex--;
-                else currentIndex = items.length - 1;
-                atualizarDestaqueItem(items, currentIndex);
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                if (currentIndex >= 0 && currentIndex < items.length) {
-                    items[currentIndex].click();
-                } else if (items.length === 1) {
-                    items[0].click();
-                } else {
-                    adicionarPrimeiroProdutoLista();
-                }
-            }
-        }
-
-        // --- NAVEGAÇÃO POR TECLADO PARA CLIENTES ---
-        function tratarTecladoClientes(e) {
-            const dropdown = document.getElementById('listaSugestoesClientes');
-            if (dropdown.style.display === 'none') return;
-
-            const items = dropdown.querySelectorAll('.suggestion-item');
-            if (items.length === 0) return;
-
-            let currentIndex = Array.from(items).findIndex(item => item.classList.contains('highlight'));
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                if (currentIndex < items.length - 1) currentIndex++;
-                else currentIndex = 0;
-                atualizarDestaqueItem(items, currentIndex);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                if (currentIndex > 0) currentIndex--;
-                else currentIndex = items.length - 1;
-                atualizarDestaqueItem(items, currentIndex);
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                if (currentIndex >= 0 && currentIndex < items.length) {
-                    items[currentIndex].click();
-                } else if (items.length === 1) {
-                    items[0].click();
-                }
-            }
-        }
-
-        function atualizarDestaqueItem(items, index) {
-            items.forEach(item => {
-                item.classList.remove('highlight');
-                item.style.backgroundColor = 'white';
-            });
-            if (index >= 0 && index < items.length) {
-                items[index].classList.add('highlight');
-                items[index].style.backgroundColor = '#f1f5f9';
-                items[index].scrollIntoView({ block: 'nearest' });
-            }
-        }
-
-        // --- FILTRO DE PRODUTOS ---
         function filtrarProdutos(termo) {
             const container = document.getElementById('listaSugestoesProdutos');
             if (!termo.trim()) {
@@ -601,7 +622,7 @@
                 div.style.padding = '8px';
                 div.style.cursor = 'pointer';
                 div.innerHTML = `<b>${p.nome}</b> (Cód: ${p.codigo_barras}) - R$ ${Number(p.preco_venda).toFixed(2)}`;
-                div.produtoData = p; // Armazena o produto no elemento para referência futura
+                div.produtoData = p;
                 div.onmousedown = () => selecionarProduto(p);
                 container.appendChild(div);
             });
@@ -615,7 +636,6 @@
         }
 
         function adicionarAoCarrinho(produto) {
-            // Converte o estoque para número para evitar conflito de tipo do banco de dados
             const estoque = Number(produto.estoque_atual || 0);
 
             if (estoque <= 0) {
@@ -639,6 +659,7 @@
                 });
             }
             atualizarCarrinho();
+            atualizarVisibilidadeCrediario();
             document.getElementById('buscaProduto').focus();
         }
 
@@ -656,12 +677,10 @@
             adicionarAoCarrinho(produto);
         }
 
-        // --- FILTRO DE CLIENTES ---
         function filtrarClientes(termo) {
             document.getElementById('cliente_id_selecionado').value = '';
             const container = document.getElementById('listaSugestoesClientes');
             if (!termo.trim()) {
-                document.getElementById('cliente_id_selecionado').value = '';
                 container.style.display = 'none';
                 return;
             }
@@ -670,7 +689,6 @@
 
             container.innerHTML = '';
 
-            // Opção para cliente avulso
             const divAvulso = document.createElement('div');
             divAvulso.className = 'suggestion-item';
             divAvulso.style.padding = '8px';
@@ -704,11 +722,13 @@
                 carrinho.splice(index, 1);
             }
             atualizarCarrinho();
+            atualizarVisibilidadeCrediario();
         }
 
         function removerItem(index) {
             carrinho.splice(index, 1);
             atualizarCarrinho();
+            atualizarVisibilidadeCrediario();
         }
 
         function atualizarCarrinho() {
@@ -760,22 +780,17 @@
                 return;
             }
 
-            // Cria o objeto do item avulso e insere no array do carrinho existente na tela de vendas
             const itemAvulso = {
-                produto_id: null, // Identifica que é um item avulso sem cadastro fixo
+                produto_id: null,
                 codigo_barras: 'AVULSO',
                 nome: `[Avulso] ${nome}`,
                 preco_unitario: preco,
                 quantidade: quantidade
             };
 
-            if (typeof carrinho !== 'undefined') {
-                carrinho.push(itemAvulso);
-                if (typeof atualizarCarrinho === 'function') {
-                    atualizarCarrinho();
-                }
-            }
-
+            carrinho.push(itemAvulso);
+            atualizarCarrinho();
+            atualizarVisibilidadeCrediario();
             fecharModalAvulso();
         }
 
@@ -795,7 +810,6 @@
             const formaPagamento = document.getElementById('formaPagamento').value;
             let clienteId = document.getElementById('cliente_id_selecionado').value;
 
-            // Se o usuário digitou o nome mas não clicou na sugestão, tenta achar pelo nome digitado
             const nomeDigitado = document.getElementById('buscaCliente').value.trim();
             if (formaPagamento === 'crediario' && !clienteId && nomeDigitado) {
                 const clienteEncontrado = listaClientesGlobal.find(c => c.nome.toLowerCase() === nomeDigitado.toLowerCase());
@@ -822,6 +836,16 @@
                 }))
             };
 
+            if (formaPagamento === 'crediario') {
+                dadosVenda.crediario = {
+                    valor_entrada: parseFloat(document.getElementById('credValorEntrada').value) || 0,
+                    qtd_parcelas: parseInt(document.getElementById('credQtdParcelas').value) || 1,
+                    tipo_juros: document.getElementById('credTipoJuros').value,
+                    taxa_juros: parseFloat(document.getElementById('credTaxaJuros')?.value) || 0,
+                    data_vencimento: document.getElementById('credDataVencimento').value || null
+                };
+            }
+
             vendaEmAndamento = true;
             try {
                 const res = await fetch(`${API_URL}/vendas`, {
@@ -839,11 +863,11 @@
                     carrinho = [];
                     await carregarDadosIniciais();
                     atualizarCarrinho();
+                    atualizarVisibilidadeCrediario();
                     document.getElementById('buscaCliente').value = '';
                     document.getElementById('cliente_id_selecionado').value = '';
                     document.getElementById('buscaProduto').focus();
                 } else {
-                    // Exibe a mensagem exata enviada pelo backend (ex: falta de estoque, caixa fechado, etc)
                     mostrarAlerta(data.error || data.erro || 'Erro ao finalizar venda.');
                 }
             } catch (error) {
@@ -872,7 +896,6 @@
             document.getElementById('textoAlertaCustomizado').innerText = mensagem;
             modal.style.display = 'flex';
 
-            // Procura o botão OK do modal, foca nele e ativa o Enter
             setTimeout(() => {
                 const btnOk = modal.querySelector('button');
                 if (btnOk) {
@@ -889,32 +912,12 @@
                 }
             }, 50);
         }
+
         function fecharAlertaCustomizado() {
             document.getElementById('modalAlerta').style.display = 'none';
         }
-        // Adicione esta função e chame-a sempre que o seu alerta for exibido na tela:
-        function ativarEnterNoAlerta() {
-            // Dá um pequeno intervalo para garantir que o modal já foi renderizado
-            setTimeout(() => {
-                // Procura automaticamente pelo botão de OK/Confirmação dentro do modal visível
-                const btnOk = document.querySelector('.modal button, div[style*="flex"] button, button.btn-ok, .swal2-confirm');
-
-                if (btnOk) {
-                    btnOk.focus(); // Joga o foco para o botão OK
-
-                    const lidarComEnter = (e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            btnOk.click(); // Simula o clique e fecha o modal
-                            document.removeEventListener('keydown', lidarComEnter);
-                        }
-                    };
-
-                    document.addEventListener('keydown', lidarComEnter);
-                }
-            }, 100);
-        }
     </script>
+    
     <!-- Modal de Alerta Customizado -->
     <div id="modalAlerta"
         style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">

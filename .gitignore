@@ -4,6 +4,7 @@ node_modules/
 
 logs/
 entregas/
+PDV-CLIENTE/
 
 # Backups e dados locais nunca devem ser versionados.
 backups/

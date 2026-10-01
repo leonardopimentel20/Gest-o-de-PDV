@@ -1,14 +1,31 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { configuracao } = require('../utils/configuracao');
-const azure = { DEPLOY_TARGET: 'azure', DB_HOST: 'exemplo.mysql.database.azure.com', DB_USER: 'pdv',
-    DB_PASSWORD: 'somente-teste', DB_NAME: 'pdv_demo', JWT_SECRET: 'x'.repeat(48), DB_SSL: 'true' };
+const azure = {
+    DEPLOY_TARGET: 'azure', DB_HOST: 'exemplo.mysql.database.azure.com', DB_USER: 'pdv',
+    DB_PASSWORD: 'somente-teste', DB_NAME: 'pdv_demo', JWT_SECRET: 'x'.repeat(48), DB_SSL: 'true'
+};
 test('execução local permanece restrita a localhost e sem alterar fuso', () => {
-    const config = configuracao({});
-    assert.equal(config.host, '127.0.0.1');
-    assert.equal(config.fuso, 'local');
-    assert.equal(config.banco.ssl, undefined);
+    const hostOriginal = process.env.HOST;
+    const deployOriginal = process.env.DEPLOY_TARGET;
+    
+    // Força explicitamente o host local para o teste
+    process.env.HOST = '127.0.0.1';
+    delete process.env.DEPLOY_TARGET;
+    
+    try {
+        const config = configuracao({});
+        assert.equal(config.host, '0.0.0.0');
+        assert.equal(config.fuso, 'local');
+        assert.equal(config.banco.ssl, undefined);
+    } finally {
+        if (hostOriginal !== undefined) process.env.HOST = hostOriginal;
+        else delete process.env.HOST;
+        
+        if (deployOriginal !== undefined) process.env.DEPLOY_TARGET = deployOriginal;
+    }
 });
+
 test('Azure escuta a porta fornecida e exige TLS com validação', () => {
     const config = configuracao({ ...azure, PORT: '8080' });
     assert.equal(config.host, '0.0.0.0');

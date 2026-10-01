@@ -12,19 +12,22 @@ app.use(express.json());
 app.disable('x-powered-by');
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
+
 app.get('/health', async (req, res) => {
     try {
         await db.query('SELECT 1');
         res.json({ servico: 'loja-sistema', instancia: require('crypto').createHash('sha256').update(__dirname.toLowerCase()).digest('hex') });
     } catch { res.status(503).json({ erro: 'Banco de dados indisponível.' }); }
 });
+
 app.use((req, res, next) => req.path === '/login' && req.method === 'POST' ? next() : verificarToken(req, res, next));
+
 app.get('/backup/status', (req, res) => {
     const { configurado, executando, ultimoSucesso, erro } = backup.estado;
     res.json({ configurado, executando, ultimoSucesso, falha: Boolean(erro) });
 });
 
-// 1. Rota para Listar Produtos corrigida para retornar os dados corretamente
+// 1. Rota para Listar Produtos
 app.get('/produtos', async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -51,7 +54,7 @@ app.get('/categorias', async (req, res) => {
     }
 });
 
-// 2. Rota para Cadastrar um Novo Produto (Com validação estrita de números e estoque positivo)
+// 2. Rota para Cadastrar um Novo Produto
 app.post('/produtos', async (req, res) => {
     const { codigo_barras, nome, categoria_id, preco_custo, preco_venda, estoque_atual, estoque_minimo } = req.body;
 
@@ -75,9 +78,9 @@ app.post('/produtos', async (req, res) => {
     }
 });
 
-// 3. Rota Única e Segura para Registrar Venda (PDV) com Validação de Crediário e Estoque[cite: 1]
+// 3. Rota Única e Segura para Registrar Venda (PDV) com Geração de Parcelas na Nova Tabela
 app.post('/vendas', async (req, res) => {
-    const { sessao_caixa_id, cliente_id, forma_pagamento, itens } = req.body;
+    const { sessao_caixa_id, cliente_id, forma_pagamento, itens, crediario } = req.body;
     const usuario_id = req.usuario.id;
     const erros = validarItensVenda(itens);
     if (!ehInteiroPositivo(sessao_caixa_id)) erros.push('Caixa inválido.');
@@ -106,7 +109,81 @@ app.post('/vendas', async (req, res) => {
                 if (totalCentavos > disponivel) recusar(`Limite insuficiente! Disponível: R$ ${(disponivel / 100).toFixed(2)}.`);
             }
         }
-        const [venda] = await connection.query('INSERT INTO vendas (sessao_caixa_id, usuario_id, cliente_id, valor_total, forma_pagamento, criado_em) VALUES (?, ?, ?, ?, ?, NOW())', [sessao_caixa_id, usuario_id, cliente_id || null, valor_total, forma_pagamento]);
+        
+        let qtdParcelas = 1;
+        let dataVencimento = null;
+        let valorFinalVenda = valor_total;
+        let dadosParcelasParaInserir = [];
+
+        if (forma_pagamento === 'crediario' && crediario) {
+            qtdParcelas = parseInt(crediario.qtd_parcelas) || 1;
+            dataVencimento = crediario.data_vencimento || null;
+
+            const entrada = parseFloat(crediario.valor_entrada) || 0;
+            let valorFinanciado = totalCentavos - Math.round(entrada * 100);
+            if (valorFinanciado < 0) valorFinanciado = 0;
+
+            let totalComJurosCentavos = totalCentavos;
+            let valorParcelaCentavos = 0;
+
+            if (crediario.tipo_juros === 'com_juros' && crediario.taxa_juros > 0 && valorFinanciado > 0) {
+                const i = Number(crediario.taxa_juros) / 100;
+                const n = qtdParcelas;
+                const p = valorFinanciado * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
+                valorParcelaCentavos = Math.round(p);
+                totalComJurosCentavos = Math.round(entrada * 100) + (valorParcelaCentavos * qtdParcelas);
+            } else {
+                valorParcelaCentavos = qtdParcelas > 0 ? Math.round(valorFinanciado / qtdParcelas) : valorFinanciado;
+                totalComJurosCentavos = Math.round(entrada * 100) + (valorParcelaCentavos * qtdParcelas);
+            }
+
+            valorFinalVenda = totalComJurosCentavos / 100;
+
+            let dataBaseVenda = new Date();
+            let primeiraDataVenc = dataVencimento ? new Date(dataVencimento + 'T00:00:00') : new Date(dataBaseVenda);
+            if (isNaN(primeiraDataVenc.getTime())) primeiraDataVenc = new Date(dataBaseVenda);
+
+            const diffTempo = primeiraDataVenc.getTime() - dataBaseVenda.getTime();
+            const diffDias = Math.round(diffTempo / (1000 * 60 * 60 * 24));
+            const intervaloDias = diffDias > 0 ? diffDias : 30;
+
+            for (let i = 1; i <= qtdParcelas; i++) {
+                let dataVencParc = new Date(primeiraDataVenc);
+                if (i > 1) {
+                    dataVencParc.setDate(primeiraDataVenc.getDate() + (intervaloDias * (i - 1)));
+                }
+                const dataFmtSql = dataVencParc.toISOString().split('T')[0];
+
+                dadosParcelasParaInserir.push({
+                    numero: i,
+                    total: qtdParcelas,
+                    valor: valorParcelaCentavos / 100,
+                    vencimento: dataFmtSql
+                });
+            }
+        } else {
+            dadosParcelasParaInserir.push({
+                numero: 1,
+                total: 1,
+                valor: valor_total,
+                vencimento: new Date().toISOString().split('T')[0]
+            });
+        }
+
+        const [venda] = await connection.query(
+            'INSERT INTO vendas (sessao_caixa_id, usuario_id, cliente_id, valor_total, forma_pagamento, qtd_parcelas, data_vencimento, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())', 
+            [sessao_caixa_id, usuario_id, cliente_id || null, valorFinalVenda, forma_pagamento, qtdParcelas, dataVencimento]
+        );
+
+        const vendaIdInserida = venda.insertId;
+
+        for (const p of dadosParcelasParaInserir) {
+            await connection.query(
+                'INSERT INTO parcelas_venda (venda_id, cliente_id, numero_parcela, total_parcelas, valor_parcela, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [vendaIdInserida, cliente_id || null, p.numero, p.total, p.valor, p.vencimento, 'pendente']
+            );
+        }
+
         for (const item of [...itens].sort((a, b) => Number(a.produto_id || 0) - Number(b.produto_id || 0))) {
             let nome = item.nome || 'Item Avulso';
             if (item.produto_id) {
@@ -116,11 +193,11 @@ app.post('/vendas', async (req, res) => {
                 nome = produtos[0].nome;
                 await connection.query('UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?', [item.quantidade, item.produto_id]);
             }
-            await connection.query('INSERT INTO itens_venda (venda_id, produto_id, quantidade, preco_unitario, nome_produto_avulso) VALUES (?, ?, ?, ?, ?)', [venda.insertId, item.produto_id || null, item.quantidade, Math.round(Number(item.preco_unitario) * 100) / 100, nome]);
+            await connection.query('INSERT INTO itens_venda (venda_id, produto_id, quantidade, preco_unitario, nome_produto_avulso) VALUES (?, ?, ?, ?, ?)', [vendaIdInserida, item.produto_id || null, item.quantidade, Math.round(Number(item.preco_unitario) * 100) / 100, nome]);
         }
         await connection.commit();
         transacao = false;
-        res.status(201).json({ mensagem: 'Venda realizada com sucesso!', venda_id: venda.insertId, valor_total });
+        res.status(201).json({ mensagem: 'Venda realizada com sucesso!', venda_id: vendaIdInserida, valor_total: valorFinalVenda });
     } catch (error) {
         if (transacao) {
             try { await connection.rollback(); } catch (rollbackError) { console.error('Erro no rollback:', rollbackError); }
@@ -138,16 +215,15 @@ app.get('/vendas', async (req, res) => {
         const [rows] = await db.query(`
             SELECT v.*, c.nome as cliente_nome,
                    DATE_FORMAT(v.criado_em, '%Y-%m-%d') AS data_local,
-                   DATE_FORMAT(v.criado_em, '%d/%m/%Y %H:%i:%s') AS data_exibicao
+                   DATE_FORMAT(v.criado_em, '%d/%m/%Y %H:%i:%s') AS data_exibicao,
+                   DATE_FORMAT(v.data_vencimento, '%d/%m/%Y') AS vencimento_exibicao
             FROM vendas v 
             LEFT JOIN clientes c ON v.cliente_id = c.id 
             ORDER BY v.id DESC
         `);
-       // Calcula o total geral das vendas
        const [totalResult] = await db.query('SELECT SUM(valor_total) as total FROM vendas');
        const totalGeral = totalResult[0]?.total || 0;
 
-       // Retorna um objeto contendo a lista e o total
        res.json({ vendas: rows, totalGeral });
    } catch (error) {
        console.error('Erro ao buscar vendas:', error);
@@ -214,7 +290,7 @@ app.post('/sessoes/fechar/:id', async (req, res) => {
     }
 });
 
-// Listar todos os clientes cadastrados com cálculo automático do débito
+// Listar todos os clientes com débito calculado
 app.get('/api/clientes', async (req, res) => {
     try {
         const query = `
@@ -233,15 +309,27 @@ app.get('/api/clientes', async (req, res) => {
     }
 });
 
-// Cadastrar um novo cliente de confiança
+// Cadastrar novo cliente (com endereço completo)
 app.post('/api/clientes', async (req, res) => {
     try {
-        const { nome, telefone, limite_credito } = req.body;
-        if (typeof nome !== 'string' || !nome.trim() || nome.trim().length > 150 || !ehNumeroPositivo(limite_credito ?? 0)) {
-            return res.status(400).json({ erro: 'O nome do cliente é obrigatório.' });
+        const { nome, telefone, limite_credito, cep, logradouro, numero, bairro, cidade, estado, complemento } = req.body;
+        if (typeof nome !== 'string' || !nome.trim() || nome.trim().length > 150) {
+            return res.status(400).json({ erro: 'O nome do cliente é obrigatório e deve ter no máximo 150 caracteres.' });
         }
-        const query = 'INSERT INTO clientes (nome, telefone, limite_credito) VALUES (?, ?, ?)';
-        const [result] = await db.query(query, [nome, telefone, limite_credito || 0.00]);
+        if (typeof telefone !== 'string' || !telefone.trim()) {
+            return res.status(400).json({ erro: 'O telefone / WhatsApp do cliente é obrigatório.' });
+        }
+        if (!ehNumeroPositivo(limite_credito ?? 0)) {
+            return res.status(400).json({ erro: 'O limite de crédito deve ser um valor válido.' });
+        }
+        const query = `
+            INSERT INTO clientes (nome, telefone, limite_credito, cep, logradouro, numero, bairro, cidade, estado, complemento) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        const [result] = await db.query(query, [
+            nome.trim(), telefone || '', limite_credito || 0.00, 
+            cep || '', logradouro || '', numero || '', bairro || '', cidade || '', estado || '', complemento || ''
+        ]);
         res.json({ id: result.insertId, mensagem: 'Cliente cadastrado com sucesso!' });
     } catch (err) {
         console.error('Erro ao cadastrar cliente:', err);
@@ -249,25 +337,70 @@ app.post('/api/clientes', async (req, res) => {
     }
 });
 
-// Buscar compras pendentes (crediário) de um cliente específico com todos os campos da venda e itens detalhados
+// Atualizar cliente existente (Edição)
+app.put('/api/clientes/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nome, telefone, limite_credito, cep, logradouro, numero, bairro, cidade, estado, complemento } = req.body;
+        if (!ehInteiroPositivo(id)) return res.status(400).json({ erro: 'ID de cliente inválido.' });
+        if (typeof nome !== 'string' || !nome.trim() || nome.trim().length > 150 || !ehNumeroPositivo(limite_credito ?? 0)) {
+            return res.status(400).json({ erro: 'O nome do cliente e o limite são obrigatórios.' });
+        }
+        const query = `
+            UPDATE clientes 
+            SET nome = ?, telefone = ?, limite_credito = ?, cep = ?, logradouro = ?, numero = ?, bairro = ?, cidade = ?, estado = ?, complemento = ?
+            WHERE id = ?
+        `;
+        const [result] = await db.query(query, [
+            nome.trim(), telefone || '', limite_credito || 0.00, 
+            cep || '', logradouro || '', numero || '', bairro || '', cidade || '', estado || '', complemento || '', id
+        ]);
+        if (result.affectedRows === 0) return res.status(404).json({ erro: 'Cliente não encontrado.' });
+        res.json({ mensagem: 'Cliente atualizado com sucesso!' });
+    } catch (err) {
+        console.error('Erro ao atualizar cliente:', err);
+        res.status(500).json({ erro: 'Erro ao atualizar cliente.' });
+    }
+});
+
+// Buscar crediários e parcelas de um cliente específico buscando da tabela parcelas_venda
 app.get('/api/clientes/:id/crediarios', async (req, res) => {
     try {
         const clienteId = req.params.id;
         const query = `
-            SELECT v.id, v.sessao_caixa_id, v.usuario_id, v.cliente_id, v.valor_total, v.forma_pagamento, v.data_venda, v.criado_em,
+            SELECT v.id, v.sessao_caixa_id, v.usuario_id, v.cliente_id, v.valor_total, v.forma_pagamento, v.criado_em,
+                   COALESCE(v.qtd_parcelas, 1) AS qtd_parcelas,
                    COALESCE(
                        NULLIF(GROUP_CONCAT(CONCAT(iv.quantidade, 'x ', COALESCE(p.nome, iv.nome_produto_avulso, 'Item')) SEPARATOR ', '), ''), 
                        'Venda sem itens detalhados'
-                   ) as itens_descricao
+                   ) as itens_descricao,
+                   (
+                       SELECT JSON_ARRAYAGG(
+                           JSON_OBJECT(
+                               'numero', pv.numero_parcela,
+                               'totalParcelas', pv.total_parcelas,
+                               'valor', pv.valor_parcela,
+                               'vencimento', DATE_FORMAT(pv.data_vencimento, '%d/%m/%Y'),
+                               'status', pv.status
+                           )
+                       )
+                       FROM parcelas_venda pv WHERE pv.venda_id = v.id
+                   ) as parcelas_json
             FROM vendas v
             LEFT JOIN itens_venda iv ON v.id = iv.venda_id
             LEFT JOIN produtos p ON iv.produto_id = p.id
             WHERE v.cliente_id = ? AND v.forma_pagamento = 'crediario'
-            GROUP BY v.id, v.sessao_caixa_id, v.usuario_id, v.cliente_id, v.valor_total, v.forma_pagamento, v.data_venda, v.criado_em
+            GROUP BY v.id
             ORDER BY v.criado_em DESC
         `;
         const [results] = await db.query(query, [clienteId]);
-        res.json(results);
+        
+        const formatados = results.map(row => ({
+            ...row,
+            parcelas: typeof row.parcelas_json === 'string' ? JSON.parse(row.parcelas_json) : (row.parcelas_json || [])
+        }));
+
+        res.json(formatados);
     } catch (err) {
         console.error('❌ Erro na query de crediários:', err);
         res.status(500).json({ erro: 'Erro ao consultar o histórico de crediário.' });
@@ -299,14 +432,14 @@ app.get('/relatorios/caixas', async (req, res) => {
             const vendas = Number(sessao.total_vendas) || 0;
             const esperado = abertura + vendas;
             const fechamento = sessao.valor_fechamento !== null ? Number(sessao.valor_fechamento) : null;
-
+            
             let diferenca = 0;
             let status_caixa = 'Aberto';
 
             if (sessao.status === 'fechado' && fechamento !== null) {
                 diferenca = fechamento - esperado;
                 if (diferenca > 0) status_caixa = `Sobra (R$ ${diferenca.toFixed(2)})`;
-                else if (diferenca < 0) status_caixa = `Falta (R$ ${Math.abs(diferenca).toFixed(2)})`;
+                else if (diferenca < 0) status_caixa = `Falta (R$ ${Math.abs(diferenca).toFixed(2)})`; 
                 else status_caixa = 'Bateu Certo';
             }
 
