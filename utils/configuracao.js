@@ -2,7 +2,7 @@ const fs = require('node:fs');
 
 function configuracao(env = process.env) {
     const nuvem = env.DEPLOY_TARGET === 'azure' || env.RAILWAY_ENVIRONMENT;
-    
+
     if (env.DEPLOY_TARGET === 'azure') {
         for (const nome of ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'JWT_SECRET']) {
             if (!env[nome]) throw new Error(`Configure ${nome} nas variáveis do App Service.`);
@@ -18,9 +18,8 @@ function configuracao(env = process.env) {
     }
 
     const ssl = env.DB_SSL === 'true' ? {
-        rejectUnauthorized: true,
-        minVersion: 'TLSv1.2',
-        ...(env.DB_SSL_CA_PATH ? { ca: fs.readFileSync(env.DB_SSL_CA_PATH, 'utf8') } : {})
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
     } : undefined;
 
     return {
