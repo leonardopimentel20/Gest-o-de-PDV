@@ -235,7 +235,8 @@
         <!-- Sub-menu Interno com Abas -->
         <div class="submenu-tabs">
             <button class="tab-btn active" onclick="trocarAba('vendas', this)">Relatório de Vendas</button>
-            <button class="tab-btn" onclick="trocarAba('crediario', this)" style="background-color: #1e3a8a; color: white;">Gestão de Crediário</button>
+            <button class="tab-btn" onclick="trocarAba('crediario', this)">Gestão de Crediário</button>
+            <button class="tab-btn" onclick="trocarAba('comprasBrecho', this)" style="background-color: #0891b2; color: white;">Aquisição de Peças (Brechó)</button>
             <button class="tab-btn" onclick="trocarAba('caixas', this)">Conferência de Caixas</button>
             <button class="tab-btn" onclick="trocarAba('estoque', this)">Estoque Baixo</button>
             <button class="tab-btn" onclick="trocarAba('maisVendidos', this)">Mais Vendidos</button>
@@ -248,7 +249,7 @@
             <p class="orientacao">A semana vai de segunda a domingo. O total reinicia automaticamente na segunda, mantendo o histórico de vendas.</p>
             <div class="resumo-cards">
                 <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #059669; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <h4 id="rotuloTotalDia" style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Total Hoje (Dia)</h4>
+                    <h4 id="rotuloTotalDia" style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Total Líquido Hoje (Compras Deduzidas)</h4>
                     <p id="totalDia" style="font-size: 1.25rem; font-weight: bold; color: #059669;">R$ 0,00</p>
                 </div>
                 <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
@@ -311,18 +312,22 @@
             </div>
         </div>
 
-        <!-- Seção Nova: Gestão de Crediário & Recebíveis Detalhado -->
+        <!-- Seção: Gestão de Crediário & Recebíveis Detalhado -->
         <div id="secaoCrediario" class="relatorio-section">
             <h2>Controle de Contas a Receber (Crediário na Rua)</h2>
-            <p class="orientacao" style="margin-bottom: 15px;">Clique no nome do cliente para abrir o card detalhado com todas as parcelas e vencimentos sequenciais.</p>
+            <p class="orientacao" style="margin-bottom: 15px;">Visualize abaixo o panorama geral do que falta receber, dividido entre vencidos e a vencer. Clique no nome do cliente para ver todas as parcelas.</p>
             
-            <div class="resumo-cards" style="grid-template-columns: repeat(2, 1fr); margin-bottom: 20px;">
+            <div class="resumo-cards" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 20px;">
                 <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <h4 style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Total Geral em Aberto (Fiado)</h4>
+                    <h4 style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Total Geral a Receber</h4>
                     <p id="totalGeralCrediario" style="font-size: 1.25rem; font-weight: bold; color: #dc2626;">R$ 0,00</p>
                 </div>
+                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #ca8a04; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <h4 style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Parcelas Vencidas</h4>
+                    <p id="totalVencidoCrediario" style="font-size: 1.25rem; font-weight: bold; color: #ca8a04;">R$ 0,00</p>
+                </div>
                 <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <h4 style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Clientes com Débito Ativo</h4>
+                    <h4 style="color: #64748b; font-size: 0.85rem; margin-bottom: 5px;">Clientes Devedores</h4>
                     <p id="totalClientesDevedores" style="font-size: 1.25rem; font-weight: bold; color: #2563eb;">0</p>
                 </div>
             </div>
@@ -331,15 +336,39 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Cliente (Clique para expandir card)</th>
+                            <th>Cliente</th>
                             <th>Telefone</th>
-                            <th>Resumo Parcelas / Status</th>
-                            <th>Limite Total</th>
+                            <th>Próximo Vencimento</th>
                             <th>Total Devido</th>
+                            <th>Status / Parcelas</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody id="tabelaGestaoCrediario"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Seção: Aquisição de Peças / Lotes (Brechó) -->
+        <div id="secaoComprasBrecho" class="relatorio-section">
+            <h2>Relatório de Aquisição de Peças e Lotes (Brechó)</h2>
+            <p class="orientacao" style="margin-bottom: 15px;">Acompanhe abaixo todas as compras de roupas e lotes feitas de fornecedores ou clientes (cadastrados e avulsos), incluindo a forma de acerto e o valor pago.</p>
+            
+            <div class="table-scroll" role="region" aria-label="Tabela com rolagem horizontal" tabindex="0">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID / Lote</th>
+                            <th>Data da Compra</th>
+                            <th>Fornecedor / Pessoa</th>
+                            <th>Descrição dos Itens / Lote</th>
+                            <th>Forma de Acerto</th>
+                            <th>Valor Pago (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaRelatorioComprasBrecho">
+                        <tr><td colspan="6" style="text-align:center; color:#64748b;">Carregando aquisições...</td></tr>
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -356,6 +385,7 @@
                             <th>Abertura</th>
                             <th>Fechamento</th>
                             <th>Total Vendas</th>
+                            <th>Total Compras (Brechó)</th>
                             <th>Esperado</th>
                             <th>Situação</th>
                         </tr>
@@ -452,7 +482,7 @@
     </div>
 
     <!-- Modal de Alerta Customizado -->
-    <div id="modalAlerta" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div id="modalAlerta" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5000; justify-content: center; align-items: center;">
         <div style="background: white; padding: 25px; border-radius: 8px; width: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); text-align: center;">
             <h3 style="color: #1e3a8a; margin-bottom: 10px;">Atenção</h3>
             <p id="textoAlertaCustomizado" style="color: #475569; margin-bottom: 20px; font-size: 1rem; line-height: 1.4;"></p>
@@ -467,6 +497,7 @@
         }
         const API_URL = window.location.origin;
         let vendasGlobal = [];
+        let comprasBrechoGlobal = [];
         let produtosEstoqueBaixoGlobal = [];
         let clientesGlobal = [];
         let pagamentoAtual = 'todos';
@@ -509,7 +540,7 @@
                     }
                 });
 
-                trocarAba('compras', document.querySelector('.tab-btn:nth-child(6)'));
+                trocarAba('compras', document.querySelector('.tab-btn:nth-child(7)'));
             }
             await carregarTodosRelatorios();
             await atualizarStatusBackup();
@@ -526,6 +557,7 @@
             elemento.classList.add('active');
             if (aba === 'vendas') document.getElementById('secaoVendas').classList.add('active');
             else if (aba === 'crediario') document.getElementById('secaoCrediario').classList.add('active');
+            else if (aba === 'comprasBrecho') document.getElementById('secaoComprasBrecho').classList.add('active');
             else if (aba === 'caixas') document.getElementById('secaoCaixas').classList.add('active');
             else if (aba === 'estoque') document.getElementById('secaoEstoque').classList.add('active');
             else if (aba === 'maisVendidos') document.getElementById('secaoMaisVendidos').classList.add('active');
@@ -534,7 +566,18 @@
 
         function calcularTotaisResumo(vendas) {
             const totais = Periodos.totais(vendas);
-            document.getElementById('totalDia').innerText = formatarMoeda(totais.dia);
+            
+            // Subtrai as compras de brechó feitas hoje (dinheiro/pix) do total do dia
+            const hojeIso = new Date().toISOString().split('T')[0];
+            let totalComprasHoje = 0;
+            comprasBrechoGlobal.forEach(cb => {
+                if (cb.forma_pagamento !== 'credito_loja' && cb.data_iso && cb.data_iso.startsWith(hojeIso)) {
+                    totalComprasHoje += Number(cb.valor_total || 0);
+                }
+            });
+
+            const totalDiaLiquido = Math.max(0, totais.dia - totalComprasHoje);
+            document.getElementById('totalDia').innerText = formatarMoeda(totalDiaLiquido);
             document.getElementById('totalSemana').innerText = formatarMoeda(totais.semana);
             document.getElementById('totalMes').innerText = formatarMoeda(totais.mes);
         }
@@ -558,6 +601,33 @@
         }
 
         async function carregarTodosRelatorios() {
+            // Carregar Histórico de Compras de Peças (Brechó) primeiro
+            try {
+                const resComprasBrecho = await fetch(`${API_URL}/api/relatorios/compras-brecho`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (resComprasBrecho.ok) {
+                    comprasBrechoGlobal = await resComprasBrecho.json();
+                    const tbodyBC = document.getElementById('tabelaRelatorioComprasBrecho');
+                    tbodyBC.innerHTML = comprasBrechoGlobal.length === 0 ? '<tr><td colspan="6" style="text-align:center; color:#64748b;">Nenhuma aquisição de lote registrada.</td></tr>' : '';
+                    
+                    comprasBrechoGlobal.forEach(cb => {
+                        tbodyBC.innerHTML += `
+                            <tr>
+                                <td>#${cb.id}</td>
+                                <td>${cb.data}</td>
+                                <td><b>${cb.cliente_nome}</b></td>
+                                <td>${cb.itens_descricao}</td>
+                                <td style="text-transform: capitalize;">${cb.forma_pagamento.replace('_', ' ')}</td>
+                                <td style="color: #dc2626; font-weight: bold;">- ${formatarMoeda(cb.valor_total)}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            } catch (e) {
+                console.error('Erro ao carregar compras de brechó:', e);
+            }
+
             try {
                 const resVendas = await fetch(`${API_URL}/vendas`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -604,7 +674,7 @@
                 });
                 const caixas = await resCaixas.json();
                 const tbodyCaixas = document.getElementById('tabelaCaixasRelatorio');
-                tbodyCaixas.innerHTML = caixas.length === 0 ? '<tr><td colspan="7" style="text-align:center; color:#64748b;">Nenhum caixa registrado.</td></tr>' : '';
+                tbodyCaixas.innerHTML = caixas.length === 0 ? '<tr><td colspan="8" style="text-align:center; color:#64748b;">Nenhum caixa registrado.</td></tr>' : '';
                 caixas.forEach(c => {
                     let corSituacao = '#1e3a8a';
                     if (c.situacao_caixa.includes('Sobra')) corSituacao = '#059669';
@@ -617,6 +687,7 @@
                             <td>${formatarMoeda(c.valor_abertura)}</td>
                             <td>${c.valor_fechamento !== null ? formatarMoeda(c.valor_fechamento) : 'Aberto'}</td>
                             <td>${formatarMoeda(c.total_vendas)}</td>
+                            <td style="color: #dc2626; font-weight: bold;">- ${formatarMoeda(c.total_compras)}</td>
                             <td>${formatarMoeda(c.valor_esperado)}</td>
                             <td style="color: ${corSituacao}; font-weight: bold;">${c.situacao_caixa}</td>
                         </tr>
@@ -701,21 +772,23 @@
             tbody.innerHTML = '';
 
             let totalGeralCred = 0;
+            let totalVencidoCred = 0;
             let clientesComDebito = 0;
+            const hojeStr = new Date().toISOString().split('T')[0];
 
             const devedores = clientes.filter(c => Number(c.total_devido || 0) > 0);
 
             if (devedores.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#64748b;">Nenhum cliente com débito pendente no crediário. Tudo limpo! ✨</td></tr>';
                 document.getElementById('totalGeralCrediario').innerText = formatarMoeda(0);
+                document.getElementById('totalVencidoCrediario').innerText = formatarMoeda(0);
                 document.getElementById('totalClientesDevedores').innerText = '0';
                 return;
             }
 
             devedores.forEach(c => {
-                const limite = Number(c.limite_credito || 0);
                 const devido = Number(c.total_devido || 0);
-
+                const saldoCredito = Number(c.saldo_credito || 0);
                 totalGeralCred += devido;
                 clientesComDebito++;
 
@@ -725,30 +798,53 @@
                 }
 
                 const comprasCliente = cacheCrediarioClientes[c.id] || [];
-                let qtdComprasAbertas = comprasCliente.length;
+                let proximoVencimentoTexto = 'Sem data';
+                let temVencido = false;
+                let menorData = null;
+
+                comprasCliente.forEach(compra => {
+                    const parcelas = gerarParcelasVenda(compra);
+                    parcelas.forEach(p => {
+                        if (p.status !== 'pago') {
+                            const partesData = p.vencimento.split('/');
+                            if (partesData.length === 3) {
+                                const dataIso = `${partesData[2]}-${partesData[1]}-${partesData[0]}`;
+                                if (!menorData || dataIso < menorData) {
+                                    menorData = dataIso;
+                                    proximoVencimentoTexto = p.vencimento;
+                                }
+                                if (dataIso < hojeStr) {
+                                    temVencido = true;
+                                    totalVencidoCred += Number(p.saldo_restante || p.valor);
+                                }
+                            }
+                        }
+                    });
+                });
 
                 let msgWhats = `Olá, *${c.nome}*! Tudo bem?\n\nPassando para enviar o resumo das suas contas em aberto conosco:\n\n`;
                 
-                if (qtdComprasAbertas > 0) {
-                    comprasCliente.forEach(compra => {
-                        const parcelas = gerarParcelasVenda(compra);
-                        msgWhats += `🛍️ *Venda #${compra.id}* (${compra.itens_descricao})\n`;
-                        if (parcelas.length > 1) {
-                            msgWhats += `   ↳ _Parcelamento em ${parcelas.length}x_:\n`;
-                            parcelas.forEach(p => {
-                                msgWhats += `   • ${p.numero}/${p.totalParcelas}: R$ ${Number(p.valor).toFixed(2)} (Venc: ${p.vencimento})\n`;
-                            });
-                        } else {
-                            msgWhats += `   • Valor: R$ ${Number(compra.valor_total).toFixed(2)} (Venc: ${parcelas[0].vencimento})\n`;
-                        }
+                comprasCliente.forEach(compra => {
+                    const parcelas = gerarParcelasVenda(compra);
+                    const parcelasAbertas = parcelas.filter(p => p.status !== 'pago');
+                    
+                    if (parcelasAbertas.length > 0) {
+                        msgWhats += `🛍️ *Venda #${compra.id}* (${compra.itens_descricao || 'Itens diversos'})\n`;
+                        parcelasAbertas.forEach(p => {
+                            const valorRestante = Number(p.saldo_restante || p.valor);
+                            msgWhats += `   • Parcela ${p.numero}/${p.totalParcelas}: ${formatarMoeda(valorRestante)} (Venc: ${p.vencimento})\n`;
+                        });
                         msgWhats += `----------------------------------\n`;
-                    });
+                    }
+                });
+
+                msgWhats += `\n💳 *Total Geral a Pagar:* *${formatarMoeda(devido)}*\n`;
+
+                if (saldoCredito > 0) {
+                    msgWhats += `💡 *Crédito em haver:* Você possui *${formatarMoeda(saldoCredito)}* de crédito disponível!\n`;
                 }
 
-                msgWhats += `\n💳 *Total Geral a Pagar:* *${formatarMoeda(devido)}*\n\n`;
-                msgWhats += `🔑 *Chave Pix (CPF):* 10567515923\n`;
-                msgWhats += `👤 *Favorecido:* Camila Diesel de Aguiar\n\n`;
-                msgWhats += `Qualquer dúvida, estamos à disposição! ✨`;
+                msgWhats += `\n🔑 *Chave Pix (CPF):* 10567515923\n👤 *Favorecido:* Camila Diesel de Aguiar\n\nQualquer dúvida, estamos à disposição! ✨`;
 
                 const linkWhats = `https://api.whatsapp.com/send?phone=${telefoneLimpo}&text=${encodeURIComponent(msgWhats)}`;
 
@@ -758,20 +854,20 @@
                             <button onclick="abrirCardCliente(${c.id}, '${c.nome.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #1e3a8a; font-weight: bold; cursor: pointer; text-align: left; font-size: 1rem; text-decoration: underline; padding: 0;">
                                 ${c.nome} 🔍
                             </button>
-                            <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">${qtdComprasAbertas} compra(s) em aberto</div>
                         </td>
                         <td>${c.telefone || '-'}</td>
-                        <td><span style="background: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600;">${qtdComprasAbertas} venda(s) registrada(s)</span></td>
-                        <td>${formatarMoeda(limite)}</td>
+                        <td><span style="font-weight: bold; color: ${temVencido ? '#dc2626' : '#059669'};">${proximoVencimentoTexto} ${temVencido ? '⚠️ (Vencido)' : ''}</span></td>
                         <td style="color: red; font-weight: bold;">${formatarMoeda(devido)}</td>
+                        <td><span style="background: ${temVencido ? '#fee2e2' : '#e2e8f0'}; color: ${temVencido ? '#991b1b' : '#475569'}; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600;">${comprasCliente.length} compra(s) registrada(s)</span></td>
                         <td>
-                            <a href="${linkWhats}" target="_blank" style="background-color: #25d366; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem; font-weight: bold; display: inline-block;">📲 Cobrar no WhatsApp</a>
+                            <a href="${linkWhats}" target="_blank" style="background-color: #25d366; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem; font-weight: bold; display: inline-block;">📲 Cobrar</a>
                         </td>
                     </tr>
                 `;
             });
 
             document.getElementById('totalGeralCrediario').innerText = formatarMoeda(totalGeralCred);
+            document.getElementById('totalVencidoCrediario').innerText = formatarMoeda(totalVencidoCred);
             document.getElementById('totalClientesDevedores').innerText = clientesComDebito;
         }
 
@@ -797,7 +893,7 @@
             }
 
             if (!compras || compras.length === 0) {
-                conteudo.innerHTML = '<p style="text-align: center; color: #64748b; padding: 20px;">Nenhuma compra em aberto encontrada para este cliente.</p>';
+                conteudo.innerHTML = '<p style="text-align: center; color: #64748b; padding: 20px;">Nenhuma compra encontrada para este cliente.</p>';
                 return;
             }
 
@@ -813,7 +909,7 @@
                             <span style="font-size: 0.85rem; color: #64748b;">Data: ${dataCompra}</span>
                         </div>
                         <div style="font-size: 0.9rem; color: #334155; margin-bottom: 10px;">
-                            🛍️ <b>Itens:</b> ${v.itens_descricao}
+                            🛍️ <b>Itens:</b> ${v.itens_descricao || 'Itens diversos'}
                         </div>
                         <div style="font-size: 0.85rem; font-weight: bold; color: #475569; margin-bottom: 5px;">
                             Parcelamento (${parcelas.length}x):
@@ -822,10 +918,11 @@
                 `;
 
                 parcelas.forEach(p => {
+                    const valorParcelaFormatado = formatarMoeda(p.saldo_restante ?? p.valor);
                     html += `
                         <div style="background: white; border: 1px solid #e2e8f0; padding: 6px 10px; border-radius: 4px; font-size: 0.85rem; display: flex; justify-content: space-between;">
                             <span><b>${p.numero}/${p.totalParcelas}</b> (${p.vencimento})</span>
-                            <span style="color: #059669; font-weight: bold;">R$ ${Number(p.valor).toFixed(2)}</span>
+                            <span style="color: #059669; font-weight: bold;">${valorParcelaFormatado}</span>
                         </div>
                     `;
                 });
@@ -889,7 +986,7 @@
                 ' · Pagamento: ' + pagamentoAtual.replaceAll('_', ' ') + '. Os cartões mostram os totais atuais de todas as formas de pagamento.';
             const filtradas = invalido ? [] : Periodos.filtrar(vendasGlobal, dataFiltro, dataFim, pagamentoAtual);
             tbody.innerHTML = '';
-            document.getElementById('rotuloTotalDia').innerText = 'Hoje';
+            document.getElementById('rotuloTotalDia').innerText = 'Total Líquido Hoje (Compras Deduzidas)';
             document.getElementById('rotuloTotalVendasFiltradas').innerText = filtradas.length + ' venda(s) · Total exibido:';
             const totalFiltrado = filtradas.reduce((total, v) => total + Math.round((Number(v.valor_total) || 0) * 100), 0) / 100;
             document.getElementById('valorTotalVendasFiltradas').innerText = formatarMoeda(totalFiltrado);
@@ -933,7 +1030,7 @@
             let msg = '📊 *RESUMO DO RELATÓRIO DE VENDAS*\n\n';
             msg += document.getElementById('periodoExibido').innerText + '\n';
             msg += '*Total exibido:* ' + document.getElementById('valorTotalVendasFiltradas').innerText + '\n\n';
-            msg += '*Hoje:* ' + totalDia + '\n*Semana atual (seg. a dom.):* ' + totalSemana + '\n*Mês atual:* ' + totalMes;
+            msg += '*Hoje (Líquido):* ' + totalDia + '\n*Semana atual (seg. a dom.):* ' + totalSemana + '\n*Mês atual:* ' + totalMes;
 
             const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
             window.open(url, '_blank');
@@ -1005,7 +1102,7 @@
                     let sugestaoQtd = (p.estoque_minimo * multiplicador) - p.estoque_atual;
                     if (sugestaoQtd < 1) sugestaoQtd = p.estoque_minimo || 5;
 
-                    const motivo = isTopSeller ? '🔥 Alta Saída + Baixo Estoque' : '⚠️ Abaixo do Mínimo';
+                    const motivo = isTopSeller ? '🔥 Alta Saída + Baixo Estoque' : '⚠ Abaixo do Mínimo';
                     const corMotivo = isTopSeller ? '#ea580c' : '#dc2626';
 
                     sugestoesGlobais.push({ nome: p.nome, qtd: sugestaoQtd });
@@ -1065,6 +1162,7 @@
         }
 
         function fecharAlertaCustomizado() {
+            document.getElementById('modalAlerta');
             document.getElementById('modalAlerta').style.display = 'none';
         }
     </script>

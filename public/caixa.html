@@ -76,6 +76,7 @@
             gap: 20px;
             padding: 20px;
             flex: 1;
+            padding-bottom: 50px;
         }
 
         @media (max-width: 900px) {
@@ -93,7 +94,7 @@
             display: flex;
             flex-direction: column;
             position: relative;
-            max-height: calc(100vh - 90px);
+            max-height: calc(100vh - 120px);
             overflow-y: auto;
         }
 
@@ -187,6 +188,7 @@
 
         select,
         input[type="text"],
+        input[type="number"],
         .btn {
             width: 100%;
             padding: 10px;
@@ -198,7 +200,8 @@
         }
 
         select,
-        input[type="text"] {
+        input[type="text"],
+        input[type="number"] {
             border: 1px solid #cbd5e1;
             background: white;
             margin-bottom: 12px;
@@ -225,6 +228,32 @@
         .btn-danger:hover {
             background-color: #b91c1c;
         }
+
+        .footer-atalhos {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 8px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+            z-index: 500;
+        }
+
+        .footer-atalhos kbd {
+            background: #334155;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #475569;
+            color: #38bdf8;
+            font-family: monospace;
+        }
     </style>
     <link rel="stylesheet" href="/css/responsivo.css">
 </head>
@@ -247,10 +276,10 @@
     </header>
 
     <div class="main-container">
-        <!-- Lado Esquerdo: Produtos e Carrinho -->
+        <!-- Lado Esquerdo -->
         <div class="card">
             <div class="search-box">
-                <input type="text" id="buscaProduto" placeholder="Digite o nome ou código de barras..."
+                <input type="text" id="buscaProduto" placeholder="Digite o nome ou código de barras... [F2]"
                     oninput="filtrarProdutos(this.value)"
                     onkeydown="tratarTecladoBusca(event, 'listaSugestoesProdutos', adicionarPrimeiroProdutoLista)">
                 <button class="btn btn-success" style="width: 120px;"
@@ -269,14 +298,12 @@
                             <th>Ação</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Itens adicionados aparecem aqui -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Lado Direito: Fechamento, Cliente e Pagamento -->
+        <!-- Lado Direito -->
         <div class="card">
             <div>
                 <h3 style="margin-bottom: 15px; color: #1e3a8a;">Resumo da Venda</h3>
@@ -290,12 +317,14 @@
                 </div>
             </div>
 
-            <!-- Botão para acionar o Item Avulso -->
-            <button type="button" onclick="abrirModalAvulso()"
-                style="background-color: #2563eb; margin-top: 10px; margin-bottom: 15px; padding: 8px 14px; font-size: 0.85rem; border-radius: 6px; color: white; border: none; cursor: pointer; font-weight: bold;">+
-                Item Avulso</button>
+            <div style="display: flex; gap: 8px; margin-top: 10px; margin-bottom: 15px;">
+                <button type="button" onclick="abrirModalAvulso()"
+                    style="flex: 1; background-color: #2563eb; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px; color: white; border: none; cursor: pointer; font-weight: bold;">+ Item Avulso [F6]</button>
+                <button type="button" onclick="abrirModalCompraPecas()"
+                    style="flex: 1; background-color: #0891b2; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px; color: white; border: none; cursor: pointer; font-weight: bold;">+ Compra Peças [F8]</button>
+            </div>
 
-            <!-- Estrutura da Sub-janela (Modal) -->
+            <!-- Modal Avulso -->
             <div id="modalAvulso"
                 style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
                 <div
@@ -311,8 +340,9 @@
                         <div class="form-group"
                             style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 5px;">
                             <label>Preço Unitário (R$):</label>
-                            <input type="number" id="avulso_preco" step="0.01" placeholder="0.00" required
-                                style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem;">
+                            <input type="text" id="avulso_preco" placeholder="0,00" required
+                                oninput="mascaraMoedaBrasileira(this)"
+                                style="padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 1rem; font-weight: bold; color: #059669;">
                         </div>
                         <div class="form-group"
                             style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 5px;">
@@ -331,18 +361,87 @@
                 </div>
             </div>
 
-            <!-- Contêiner pai com position: relative correto para o campo de clientes -->
+            <!-- Modal de Compra de Peças / Lote (Brechó) -->
+            <div id="modalCompraPecas" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+                <div style="background: white; padding: 25px; border-radius: 8px; width: 620px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                    <h3 style="color: #1e3a8a; margin-bottom: 12px;">🛍️ Comprar Lote / Saco de Roupas (Brechó)</h3>
+                    
+                    <div style="position: relative; margin-bottom: 10px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Nome do Cliente / Fornecedor (Busque ou Digite):</label>
+                        <input type="text" id="buscaClienteCompraModal" placeholder="Digite o nome da pessoa (ex: Maria Avulsa)..." oninput="filtrarClientesCompraModal(this.value)" autocomplete="off" style="margin-bottom: 0; padding: 8px;">
+                        <input type="hidden" id="clienteCompraModalId">
+                        <div id="listaSugestoesClientesCompraModal" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #cbd5e1; border-radius: 4px; z-index: 3000; max-height: 120px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                    </div>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
+                        <label style="font-size: 0.85rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 6px;">Adicionar Lote / Saco:</label>
+                        <input type="text" id="pecaModalNome" placeholder="Descrição (Ex: Saco de Inverno Variado)" style="margin-bottom: 8px; padding: 8px;">
+                        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                            <input type="number" id="pecaModalQtd" placeholder="Qtd. Peças" value="10" min="1" style="width: 90px; margin-bottom: 0; padding: 8px;">
+                            <input type="text" id="pecaModalCusto" placeholder="Valor Total Pago no Saco (R$)" oninput="mascaraMoedaBrasileira(this)" style="flex: 1; margin-bottom: 0; padding: 8px;">
+                            <input type="text" id="pecaModalVenda" placeholder="Revenda Média (Unid.)" oninput="mascaraMoedaBrasileira(this)" style="flex: 1; margin-bottom: 0; padding: 8px;">
+                        </div>
+                        <button type="button" class="btn btn-success" onclick="adicionarPecaModalLista()" style="padding: 8px; font-size: 0.9rem;">+ Incluir Lote na Lista</button>
+                    </div>
+
+                    <div style="max-height: 140px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 10px;">
+                        <table id="tabelaPecasCompraModal" style="font-size: 0.85rem;">
+                            <thead>
+                                <tr>
+                                    <th>Descrição</th>
+                                    <th>Qtd</th>
+                                    <th>Total Pago</th>
+                                    <th>Revenda</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Forma de Acerto:</label>
+                    <select id="formaAcertoModal" style="padding: 8px; margin-bottom: 10px;">
+                        <option value="dinheiro">Dinheiro (Sai do Caixa)</option>
+                        <option value="pix">Pix (Sai do Caixa)</option>
+                        <option value="credito_loja">Deixar em Crédito em Haver (Exige Cliente Cadastrado)</option>
+                    </select>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-bottom: 10px;">
+                        <span style="font-weight: bold; color: #1e3a8a;">Total da Compra:</span>
+                        <span id="totalCompraModalR$" style="font-size: 1.2rem; font-weight: bold; color: #059669;">R$ 0,00</span>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" onclick="fecharModalCompraPecas()" style="flex: 1; background-color: #64748b; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Cancelar</button>
+                        <button type="button" onclick="finalizarCompraPecasModal()" style="flex: 1; background-color: #059669; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Confirmar Aquisição</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seleção de Cliente e Crédito -->
             <div style="position: relative; margin-bottom: 15px;">
                 <label
                     style="display: block; margin-bottom: 5px; font-weight: 600; color: #475569; font-size: 0.9rem;">Cliente
-                    (Obrigatório para Crediário):</label>
+                    (Obrigatório para Crediário) [F4]:</label>
                 <input type="text" id="buscaCliente" placeholder="Digite para buscar cliente..."
                     oninput="filtrarClientes(this.value)" autocomplete="off"
                     style="width: 100%; padding: 8px; box-sizing: border-box;">
 
                 <input type="hidden" id="cliente_id_selecionado">
 
-                <!-- Dropdown ancorado perfeitamente logo abaixo -->
+                <div id="blocoAvisoCredito"
+                    style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px; border-radius: 6px; margin-top: 6px;">
+                    <div id="avisoSaldoCreditoCliente"
+                        style="font-size: 0.85rem; color: #166534; font-weight: bold; margin-bottom: 5px;"></div>
+                    <label
+                        style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; color: #166534; cursor: pointer;">
+                        <input type="checkbox" id="checkUsarCredito"
+                            onchange="atualizarCarrinho(); calcularCrediario();"
+                            style="width: 16px; height: 16px; cursor: pointer;">
+                        Abater valor usando este crédito em haver
+                    </label>
+                </div>
+
                 <div id="listaSugestoesClientes"
                     style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #cbd5e1; border-radius: 4px; z-index: 9999; max-height: 150px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                 </div>
@@ -359,32 +458,44 @@
                 <option value="crediario">Crediário (Fiado)</option>
             </select>
 
-            <!-- Bloco de Configuração do Crediário -->
+            <!-- Bloco Crediário -->
             <div id="blocoCrediario"
                 style="display: none; background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
-                
-                <label style="font-size: 0.85rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Prazo de Vencimento:</label>
+                <label
+                    style="font-size: 0.85rem; font-weight: 600; color: #1e3a8a; display: block; margin-bottom: 4px;">Prazo
+                    de Vencimento (1ª Parcela):</label>
                 <div style="display: flex; gap: 5px; margin-bottom: 8px;">
                     <button type="button" onclick="definirPrazoCrediario(7)"
-                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">7 dias</button>
+                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">7
+                        dias</button>
                     <button type="button" onclick="definirPrazoCrediario(14)"
-                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">14 dias</button>
+                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">14
+                        dias</button>
                     <button type="button" onclick="definirPrazoCrediario(21)"
-                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">21 dias</button>
+                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">21
+                        dias</button>
                     <button type="button" onclick="definirPrazoCrediario(28)"
-                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">28 dias</button>
+                        style="flex: 1; padding: 6px; font-size: 0.8rem; background: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">28
+                        dias</button>
                 </div>
 
-                <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Data de Vencimento / Acerto:</label>
+                <label
+                    style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Data
+                    de Vencimento Inicial:</label>
                 <input type="date" id="credDataVencimento"
                     style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
 
-                <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Valor da Entrada (R$):</label>
-                <input type="number" id="credValorEntrada" step="0.01" placeholder="0.00" value="0.00"
-                    oninput="calcularCrediario()" style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                <label
+                    style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Valor
+                    da Entrada (R$):</label>
+                <input type="text" id="credValorEntrada" placeholder="0,00" value="0,00"
+                    oninput="mascaraMoedaBrasileira(this); calcularCrediario();"
+                    style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
 
-                <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Número de Parcelas:</label>
-                <select id="credQtdParcelas" onchange="calcularCrediario()"
+                <label
+                    style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Número
+                    de Parcelas:</label>
+                <select id="credQtdParcelas" onchange="renderizarDatasCustomizadasParcelas(); calcularCrediario();"
                     style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                     <option value="1">1x (Sem juros)</option>
                     <option value="2">2x</option>
@@ -396,7 +507,18 @@
                     <option value="12">12x</option>
                 </select>
 
-                <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Tipo de Juros:</label>
+                <div id="blocoDatasCustomizadas"
+                    style="margin-bottom: 10px; background: #fff; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; display: none;">
+                    <label
+                        style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.8rem; color: #1e3a8a;">📅
+                        Datas Customizadas por Parcela:</label>
+                    <div id="containerInputsDatasParcelas" style="display: flex; flex-direction: column; gap: 6px;">
+                    </div>
+                </div>
+
+                <label
+                    style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Tipo
+                    de Juros:</label>
                 <select id="credTipoJuros" onchange="calcularCrediario()"
                     style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                     <option value="nenhum">Sem Juros</option>
@@ -404,14 +526,16 @@
                 </select>
 
                 <div id="divTaxaJuros" style="display: none; margin-bottom: 10px;">
-                    <label style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Taxa de Juros Mensal (%):</label>
+                    <label
+                        style="display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85rem; color: #1e3a8a;">Taxa
+                        de Juros Mensal (%):</label>
                     <input type="number" id="credTaxaJuros" step="0.01" placeholder="2.00" value="2.00"
-                        oninput="calcularCrediario()" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        oninput="calcularCrediario()"
+                        style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
                 </div>
 
                 <div id="resumoCrediario"
                     style="font-size: 0.9rem; color: #334155; border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 5px;">
-                    <!-- Preenchido dinamicamente -->
                 </div>
             </div>
 
@@ -419,21 +543,50 @@
                 style="font-size: 1.1rem; padding: 14px; width: 100%; margin-top: auto;">Finalizar Venda (F10)</button>
         </div>
     </div>
-    
+
+    <!-- Barra de Atalhos no Rodapé -->
+    <div class="footer-atalhos">
+        <span><kbd>F2</kbd> Buscar Produto</span>
+        <span><kbd>F4</kbd> Selecionar Cliente</span>
+        <span><kbd>F6</kbd> Item Avulso</span>
+        <span><kbd>F8</kbd> Comprar Peças</span>
+        <span><kbd>F10</kbd> Finalizar Venda</span>
+    </div>
+
     <script>
         const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = 'login.html';
-        }
+        if (!token) { window.location.href = 'login.html'; }
         const API_URL = window.location.origin;
         let carrinho = [];
+        let pecasCompraModalLista = [];
         let sessaoCaixaAtiva = null;
         let usuarioLogado = null;
         let listaProdutosGlobal = [];
         let listaClientesGlobal = [];
+        let clienteSelecionadoObjeto = null;
+
+        function formatarMoeda(valor) {
+            return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function mascaraMoedaBrasileira(input) {
+            let apenasNumeros = input.value.replace(/\D/g, '');
+            if (!apenasNumeros) {
+                input.value = '';
+                return;
+            }
+            let valorFloat = parseFloat(apenasNumeros) / 100;
+            input.value = valorFloat.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function converterMoedaParaFloat(valorStr) {
+            if (!valorStr) return 0;
+            if (typeof valorStr === 'number') return valorStr;
+            let limpo = valorStr.replace(/[^\d,]/g, '').replace(',', '.');
+            return parseFloat(limpo) || 0;
+        }
 
         window.addEventListener('DOMContentLoaded', async () => {
-            const token = localStorage.getItem('token');
             const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
             if (usuario.cargo === 'operador') {
                 document.querySelectorAll('.nav-links a').forEach(a => {
@@ -445,7 +598,6 @@
             }
 
             usuarioLogado = usuario;
-
             await verificarCaixaAtivo();
             await carregarDadosIniciais();
 
@@ -454,25 +606,70 @@
                 selectPagamento.addEventListener('change', atualizarVisibilidadeCrediario);
                 atualizarVisibilidadeCrediario();
             }
+
+            definirPrazoCrediario(30);
         });
 
         function atualizarVisibilidadeCrediario() {
             const formaPagamento = document.getElementById('formaPagamento').value;
             const bloco = document.getElementById('blocoCrediario');
-
             if (!bloco) return;
 
             if (formaPagamento === 'crediario') {
                 bloco.style.display = 'block';
+                renderizarDatasCustomizadasParcelas();
                 calcularCrediario();
             } else {
                 bloco.style.display = 'none';
             }
         }
 
+        function renderizarDatasCustomizadasParcelas() {
+            const qtd = parseInt(document.getElementById('credQtdParcelas').value) || 1;
+            const blocoDatas = document.getElementById('blocoDatasCustomizadas');
+            const container = document.getElementById('containerInputsDatasParcelas');
+
+            if (qtd <= 1) {
+                blocoDatas.style.display = 'none';
+                return;
+            }
+
+            blocoDatas.style.display = 'block';
+            container.innerHTML = '';
+
+            let dataBaseStr = document.getElementById('credDataVencimento').value;
+            let dataBase = dataBaseStr ? new Date(dataBaseStr + 'T00:00:00') : new Date();
+
+            for (let i = 1; i <= qtd; i++) {
+                let dataVenc = new Date(dataBase);
+                if (i > 1) dataVenc.setMonth(dataBase.getMonth() + (i - 1));
+                const dataFmt = dataVenc.toISOString().split('T')[0];
+
+                const div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.alignItems = 'center';
+                div.style.justifyContent = 'space-between';
+                div.style.gap = '8px';
+                div.innerHTML = `
+                    <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">Parcela ${i}ª:</span>
+                    <input type="date" id="data_parcela_${i}" value="${dataFmt}" style="padding: 4px 6px; font-size: 0.85rem; border: 1px solid #cbd5e1; border-radius: 4px; width: 140px;">
+                `;
+                container.appendChild(div);
+            }
+        }
+
         function calcularCrediario() {
-            const totalGeral = carrinho.reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0);
-            const entrada = parseFloat(document.getElementById('credValorEntrada').value) || 0;
+            const totalBruto = carrinho.reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0);
+
+            let totalGeral = totalBruto;
+            const usarCreditoCheck = document.getElementById('checkUsarCredito');
+            if (usarCreditoCheck && usarCreditoCheck.checked && clienteSelecionadoObjeto) {
+                const saldoCredito = Number(clienteSelecionadoObjeto.saldo_credito || 0);
+                const desconto = Math.min(totalBruto, saldoCredito);
+                totalGeral = Math.max(0, totalBruto - desconto);
+            }
+
+            const entrada = converterMoedaParaFloat(document.getElementById('credValorEntrada').value);
             const qtdParcelas = parseInt(document.getElementById('credQtdParcelas').value) || 1;
             const tipoJuros = document.getElementById('credTipoJuros').value;
             const divTaxa = document.getElementById('divTaxaJuros');
@@ -503,9 +700,9 @@
             const resumoEl = document.getElementById('resumoCrediario');
             if (resumoEl) {
                 resumoEl.innerHTML = `
-                    <div>Financiado: <b>R$ ${valorFinanciado.toFixed(2)}</b></div>
-                    <div>Parcelas: <b>${qtdParcelas}x de R$ ${valorParcela.toFixed(2)}</b></div>
-                    <div>Total com Acréscimo: <b>R$ ${valorTotalFinal.toFixed(2)}</b></div>
+                    <div>Financiado: <b>${formatarMoeda(valorFinanciado)}</b></div>
+                    <div>Parcelas: <b>${qtdParcelas}x de ${formatarMoeda(valorParcela)}</b></div>
+                    <div>Total com Acréscimo: <b>${formatarMoeda(valorTotalFinal)}</b></div>
                 `;
             }
         }
@@ -517,6 +714,7 @@
             const mes = String(data.getMonth() + 1).padStart(2, '0');
             const dia = String(data.getDate()).padStart(2, '0');
             document.getElementById('credDataVencimento').value = `${ano}-${mes}-${dia}`;
+            renderizarDatasCustomizadasParcelas();
         }
 
         async function verificarCaixaAtivo() {
@@ -534,26 +732,18 @@
                     badge.innerText = `Caixa Aberto (#${sessaoCaixaAtiva.id})`;
                     badge.style.background = '#059669';
                 }
-            } catch (error) {
-                console.error('Erro ao verificar caixa:', error);
-            }
+            } catch (error) { console.error('Erro ao verificar caixa:', error); }
         }
 
         async function carregarDadosIniciais() {
             try {
                 const [resProd, resCli] = await Promise.all([
-                    fetch(`${API_URL}/produtos`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    }),
-                    fetch(`${API_URL}/api/clientes`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
+                    fetch(`${API_URL}/produtos`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_URL}/api/clientes`, { headers: { 'Authorization': `Bearer ${token}` } })
                 ]);
                 listaProdutosGlobal = await resProd.json();
                 listaClientesGlobal = await resCli.json();
-            } catch (error) {
-                console.error('Erro ao carregar dados:', error);
-            }
+            } catch (error) { console.error('Erro ao carregar dados:', error); }
         }
 
         function tratarTecladoBusca(e, dropdownId, acaoEnterPadrao) {
@@ -567,26 +757,19 @@
             if (items.length === 0) return;
 
             let currentIndex = Array.from(items).findIndex(item => item.classList.contains('highlight'));
-
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                if (currentIndex < items.length - 1) currentIndex++;
-                else currentIndex = 0;
+                currentIndex = (currentIndex < items.length - 1) ? currentIndex + 1 : 0;
                 atualizarDestaqueItem(items, currentIndex);
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                if (currentIndex > 0) currentIndex--;
-                else currentIndex = items.length - 1;
+                currentIndex = (currentIndex > 0) ? currentIndex - 1 : items.length - 1;
                 atualizarDestaqueItem(items, currentIndex);
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                if (currentIndex >= 0 && currentIndex < items.length) {
-                    selecionarProduto(items[currentIndex].produtoData);
-                } else if (items.length === 1) {
-                    items[0].click();
-                } else {
-                    acaoEnterPadrao();
-                }
+                if (currentIndex >= 0 && currentIndex < items.length) selecionarProduto(items[currentIndex].produtoData);
+                else if (items.length === 1) items[0].click();
+                else acaoEnterPadrao();
             }
         }
 
@@ -600,20 +783,14 @@
 
         function filtrarProdutos(termo) {
             const container = document.getElementById('listaSugestoesProdutos');
-            if (!termo.trim()) {
-                container.style.display = 'none';
-                return;
-            }
+            if (!termo.trim()) { container.style.display = 'none'; return; }
 
             const filtrados = listaProdutosGlobal.filter(p =>
                 p.codigo_barras.toLowerCase().includes(termo.toLowerCase()) ||
                 p.nome.toLowerCase().includes(termo.toLowerCase())
             );
 
-            if (filtrados.length === 0) {
-                container.style.display = 'none';
-                return;
-            }
+            if (filtrados.length === 0) { container.style.display = 'none'; return; }
 
             container.innerHTML = '';
             filtrados.forEach(p => {
@@ -621,7 +798,7 @@
                 div.className = 'suggestion-item';
                 div.style.padding = '8px';
                 div.style.cursor = 'pointer';
-                div.innerHTML = `<b>${p.nome}</b> (Cód: ${p.codigo_barras}) - R$ ${Number(p.preco_venda).toFixed(2)}`;
+                div.innerHTML = `<b>${p.nome}</b> (Cód: ${p.codigo_barras}) - ${formatarMoeda(p.preco_venda)}`;
                 div.produtoData = p;
                 div.onmousedown = () => selecionarProduto(p);
                 container.appendChild(div);
@@ -637,18 +814,11 @@
 
         function adicionarAoCarrinho(produto) {
             const estoque = Number(produto.estoque_atual || 0);
-
-            if (estoque <= 0) {
-                mostrarAlerta('Produto sem estoque disponível!');
-                return;
-            }
+            if (estoque <= 0) { mostrarAlerta('Produto sem estoque disponível!'); return; }
 
             const itemExistente = carrinho.find(item => item.produto_id === produto.id);
             if (itemExistente) {
-                if (itemExistente.quantidade + 1 > estoque) {
-                    mostrarAlerta('Quantidade excede o estoque atual!');
-                    return;
-                }
+                if (itemExistente.quantidade + 1 > estoque) { mostrarAlerta('Quantidade excede o estoque atual!'); return; }
                 itemExistente.quantidade++;
             } else {
                 carrinho.push({
@@ -668,10 +838,7 @@
             if (!termo) return;
 
             const produto = listaProdutosGlobal.find(p => p.codigo_barras === termo || p.nome.toLowerCase().includes(termo.toLowerCase()));
-            if (!produto) {
-                mostrarAlerta('Produto não encontrado!');
-                return;
-            }
+            if (!produto) { mostrarAlerta('Produto não encontrado!'); return; }
             document.getElementById('buscaProduto').value = '';
             document.getElementById('listaSugestoesProdutos').style.display = 'none';
             adicionarAoCarrinho(produto);
@@ -679,14 +846,12 @@
 
         function filtrarClientes(termo) {
             document.getElementById('cliente_id_selecionado').value = '';
+            clienteSelecionadoObjeto = null;
+            document.getElementById('blocoAvisoCredito').style.display = 'none';
             const container = document.getElementById('listaSugestoesClientes');
-            if (!termo.trim()) {
-                container.style.display = 'none';
-                return;
-            }
+            if (!termo.trim()) { container.style.display = 'none'; return; }
 
             const filtrados = listaClientesGlobal.filter(c => c.nome.toLowerCase().includes(termo.toLowerCase()));
-
             container.innerHTML = '';
 
             const divAvulso = document.createElement('div');
@@ -694,7 +859,7 @@
             divAvulso.style.padding = '8px';
             divAvulso.style.cursor = 'pointer';
             divAvulso.innerHTML = '<i>-- Cliente Avulso / À Vista --</i>';
-            divAvulso.onclick = () => selecionarCliente({ id: '', nome: '' });
+            divAvulso.onclick = () => selecionarCliente({ id: '', nome: '', saldo_credito: 0 });
             container.appendChild(divAvulso);
 
             filtrados.forEach(c => {
@@ -702,7 +867,8 @@
                 div.className = 'suggestion-item';
                 div.style.padding = '8px';
                 div.style.cursor = 'pointer';
-                div.innerHTML = `<b>${c.nome}</b> (${c.telefone || 'Sem tel'})`;
+                const creditoHaver = Number(c.saldo_credito || 0);
+                div.innerHTML = `<b>${c.nome}</b> (${c.telefone || 'Sem tel'}) ${creditoHaver > 0 ? `<span style="color: #059669;">(Crédito: ${formatarMoeda(creditoHaver)})</span>` : ''}`;
                 div.onclick = () => selecionarCliente(c);
                 container.appendChild(div);
             });
@@ -711,16 +877,29 @@
         }
 
         async function selecionarCliente(cliente) {
-            document.getElementById('buscaCliente').value = cliente.nome;
-            document.getElementById('cliente_id_selecionado').value = cliente.id;
+            clienteSelecionadoObjeto = cliente.id ? cliente : null;
+            document.getElementById('buscaCliente').value = cliente.id ? cliente.nome : '';
+            document.getElementById('cliente_id_selecionado').value = cliente.id || '';
+
+            const creditoHaver = Number(cliente.saldo_credito || 0);
+            const blocoAviso = document.getElementById('blocoAvisoCredito');
+
+            if (creditoHaver > 0) {
+                document.getElementById('avisoSaldoCreditoCliente').innerText = `💡 Este cliente possui ${formatarMoeda(creditoHaver)} de crédito em haver!`;
+                blocoAviso.style.display = 'block';
+                document.getElementById('checkUsarCredito').checked = false;
+            } else {
+                blocoAviso.style.display = 'none';
+                document.getElementById('checkUsarCredito').checked = false;
+            }
+
             document.getElementById('listaSugestoesClientes').style.display = 'none';
+            atualizarCarrinho();
         }
 
         function alterarQtd(index, qtd) {
             carrinho[index].quantidade = Number(qtd);
-            if (carrinho[index].quantidade <= 0) {
-                carrinho.splice(index, 1);
-            }
+            if (carrinho[index].quantidade <= 0) carrinho.splice(index, 1);
             atualizarCarrinho();
             atualizarVisibilidadeCrediario();
         }
@@ -735,44 +914,53 @@
             const tbody = document.querySelector('#tabelaCarrinho tbody');
             tbody.innerHTML = '';
 
-            let totalGeral = 0;
+            let totalBruto = 0;
             let totalItens = 0;
 
             carrinho.forEach((item, index) => {
                 const subtotal = item.quantidade * item.preco_unitario;
-                totalGeral += subtotal;
+                totalBruto += subtotal;
                 totalItens += item.quantidade;
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${item.nome}</td>
                     <td><input type="number" value="${item.quantidade}" min="1" style="width: 60px; padding: 4px;" onchange="alterarQtd(${index}, this.value)"></td>
-                    <td>R$ ${item.preco_unitario.toFixed(2)}</td>
-                    <td>R$ ${subtotal.toFixed(2)}</td>
+                    <td>${formatarMoeda(item.preco_unitario)}</td>
+                    <td>${formatarMoeda(subtotal)}</td>
                     <td><button class="btn btn-danger" onclick="removerItem(${index})">X</button></td>
                 `;
                 tbody.appendChild(tr);
             });
 
+            let totalFinal = totalBruto;
+            const usarCreditoCheck = document.getElementById('checkUsarCredito');
+
+            if (usarCreditoCheck && usarCreditoCheck.checked && clienteSelecionadoObjeto) {
+                const saldoCredito = Number(clienteSelecionadoObjeto.saldo_credito || 0);
+                const desconto = Math.min(totalBruto, saldoCredito);
+                totalFinal = Math.max(0, totalBruto - desconto);
+            }
+
             document.getElementById('qtdItens').innerText = totalItens;
-            document.getElementById('valorTotal').innerText = `R$ ${totalGeral.toFixed(2)}`;
+            document.getElementById('valorTotal').innerText = formatarMoeda(totalFinal);
+            calcularCrediario();
         }
 
-        function abrirModalAvulso() {
-            document.getElementById('modalAvulso').style.display = 'flex';
-        }
-
+        function abrirModalAvulso() { document.getElementById('modalAvulso').style.display = 'flex'; document.getElementById('avulso_nome').focus(); }
         function fecharModalAvulso() {
             document.getElementById('modalAvulso').style.display = 'none';
             document.getElementById('avulso_nome').value = '';
             document.getElementById('avulso_preco').value = '';
             document.getElementById('avulso_qtd').value = '1';
+            document.getElementById('buscaProduto').focus();
         }
 
         function adicionarItemAvulso(event) {
             event.preventDefault();
             const nome = document.getElementById('avulso_nome').value.trim();
-            const preco = parseFloat(document.getElementById('avulso_preco').value);
+            const precoStr = document.getElementById('avulso_preco').value;
+            const preco = converterMoedaParaFloat(precoStr);
             const quantidade = parseInt(document.getElementById('avulso_qtd').value);
 
             if (!nome || isNaN(preco) || preco <= 0 || isNaN(quantidade) || quantidade <= 0) {
@@ -780,43 +968,183 @@
                 return;
             }
 
-            const itemAvulso = {
+            carrinho.push({
                 produto_id: null,
                 codigo_barras: 'AVULSO',
                 nome: `[Avulso] ${nome}`,
                 preco_unitario: preco,
                 quantidade: quantidade
-            };
+            });
 
-            carrinho.push(itemAvulso);
             atualizarCarrinho();
             atualizarVisibilidadeCrediario();
             fecharModalAvulso();
         }
 
+        // --- FUNÇÕES DO MODAL DE COMPRA DE PEÇAS / LOTE (BRECHÓ) ---
+        function abrirModalCompraPecas() {
+            pecasCompraModalLista = [];
+            document.getElementById('buscaClienteCompraModal').value = '';
+            document.getElementById('clienteCompraModalId').value = '';
+            document.getElementById('pecaModalNome').value = '';
+            document.getElementById('pecaModalQtd').value = '10';
+            document.getElementById('pecaModalCusto').value = '';
+            document.getElementById('pecaModalVenda').value = '';
+            atualizarTabelaCompraModal();
+            document.getElementById('modalCompraPecas').style.display = 'flex';
+            document.getElementById('buscaClienteCompraModal').focus();
+        }
+
+        function fecharModalCompraPecas() {
+            document.getElementById('modalCompraPecas').style.display = 'none';
+            document.getElementById('buscaProduto').focus();
+        }
+
+        function filtrarClientesCompraModal(termo) {
+            const container = document.getElementById('listaSugestoesClientesCompraModal');
+            document.getElementById('clienteCompraModalId').value = '';
+            if (!termo.trim()) { container.style.display = 'none'; return; }
+
+            const filtrados = listaClientesGlobal.filter(c => c.nome.toLowerCase().includes(termo.toLowerCase()));
+            container.innerHTML = '';
+            
+            filtrados.forEach(c => {
+                const div = document.createElement('div');
+                div.style.padding = '8px';
+                div.style.cursor = 'pointer';
+                div.style.borderBottom = '1px solid #f1f5f9';
+                div.innerHTML = `<b>${c.nome}</b> (${c.telefone || 'Sem tel'})`;
+                div.onmousedown = () => {
+                    document.getElementById('buscaClienteCompraModal').value = c.nome;
+                    document.getElementById('clienteCompraModalId').value = c.id;
+                    container.style.display = 'none';
+                };
+                container.appendChild(div);
+            });
+
+            if (filtrados.length === 0) {
+                container.style.display = 'none';
+            } else {
+                container.style.display = 'block';
+            }
+        }
+
+        function adicionarPecaModalLista() {
+            const nome = document.getElementById('pecaModalNome').value.trim();
+            const qtd = parseInt(document.getElementById('pecaModalQtd').value) || 1;
+            const custoTotal = converterMoedaParaFloat(document.getElementById('pecaModalCusto').value);
+            const venda = converterMoedaParaFloat(document.getElementById('pecaModalVenda').value) || ((custoTotal / qtd) * 2);
+
+            if (!nome || custoTotal <= 0 || qtd <= 0) {
+                mostrarAlerta('Informe a descrição, a quantidade estimada de peças e o valor total pago.');
+                return;
+            }
+
+            const custoUnitario = custoTotal / qtd;
+
+            pecasCompraModalLista.push({ 
+                nome, 
+                quantidade: qtd, 
+                preco_custo: Number(custoUnitario.toFixed(2)), 
+                preco_venda: Number(venda.toFixed(2)) 
+            });
+
+            document.getElementById('pecaModalNome').value = '';
+            document.getElementById('pecaModalQtd').value = '10';
+            document.getElementById('pecaModalCusto').value = '';
+            document.getElementById('pecaModalVenda').value = '';
+            atualizarTabelaCompraModal();
+            document.getElementById('pecaModalNome').focus();
+        }
+
+        function removerPecaCompraModal(index) {
+            pecasCompraModalLista.splice(index, 1);
+            atualizarTabelaCompraModal();
+        }
+
+        function atualizarTabelaCompraModal() {
+            const tbody = document.querySelector('#tabelaPecasCompraModal tbody');
+            tbody.innerHTML = '';
+            let totalGeral = 0;
+
+            pecasCompraModalLista.forEach((p, idx) => {
+                const subtotal = p.preco_custo * p.quantidade;
+                totalGeral += subtotal;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${p.nome}</td>
+                    <td>${p.quantidade}</td>
+                    <td>${formatarMoeda(subtotal)}</td>
+                    <td>${formatarMoeda(p.preco_venda)}</td>
+                    <td><button class="btn-danger" style="padding: 2px 6px;" onclick="removerPecaCompraModal(${idx})">X</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('totalCompraModalR$').innerText = formatarMoeda(totalGeral);
+        }
+
+        async function finalizarCompraPecasModal() {
+            if (pecasCompraModalLista.length === 0) { mostrarAlerta('Adicione pelo menos um lote na lista.'); return; }
+            
+            let clienteId = document.getElementById('clienteCompraModalId').value;
+            let nomeClienteDigitado = document.getElementById('buscaClienteCompraModal').value.trim();
+            const formaAcerto = document.getElementById('formaAcertoModal').value;
+
+            if (formaAcerto === 'credito_loja' && !clienteId) {
+                mostrarAlerta('Para deixar o valor em crédito em haver, é obrigatório selecionar um cliente já cadastrado!');
+                return;
+            }
+
+            if (!nomeClienteDigitado) {
+                nomeClienteDigitado = 'Cliente Avulso';
+            }
+
+            if (!sessaoCaixaAtiva) { mostrarAlerta('Nenhuma sessão de caixa ativa encontrada!'); return; }
+
+            const dados = {
+                sessao_caixa_id: sessaoCaixaAtiva.id,
+                cliente_id: clienteId ? Number(clienteId) : null,
+                nome_cliente_avulso: !clienteId ? nomeClienteDigitado : null,
+                forma_pagamento: formaAcerto,
+                itens: pecasCompraModalLista
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/compras-brecho`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(dados)
+                });
+
+                const respJson = await res.json();
+                if (res.ok) {
+                    fecharModalCompraPecas();
+                    await carregarDadosIniciais();
+
+                    if (respJson.comprovante) {
+                        abrirModalComprovanteCompra(respJson.comprovante);
+                    } else {
+                        mostrarAlerta(respJson.mensagem);
+                    }
+                } else {
+                    mostrarAlerta(respJson.erro || 'Erro ao registrar compra.');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarAlerta('Erro de conexão ao registrar compra.');
+            }
+        }
+
         let vendaEmAndamento = false;
         async function finalizarVenda() {
             if (vendaEmAndamento) return;
-            if (carrinho.length === 0) {
-                mostrarAlerta('O carrinho está vazio!');
-                return;
-            }
-
-            if (!sessaoCaixaAtiva) {
-                mostrarAlerta('Nenhuma sessão de caixa ativa encontrada!');
-                return;
-            }
+            if (carrinho.length === 0) { mostrarAlerta('O carrinho está vazio!'); return; }
+            if (!sessaoCaixaAtiva) { mostrarAlerta('Nenhuma sessão de caixa ativa encontrada!'); return; }
 
             const formaPagamento = document.getElementById('formaPagamento').value;
             let clienteId = document.getElementById('cliente_id_selecionado').value;
-
-            const nomeDigitado = document.getElementById('buscaCliente').value.trim();
-            if (formaPagamento === 'crediario' && !clienteId && nomeDigitado) {
-                const clienteEncontrado = listaClientesGlobal.find(c => c.nome.toLowerCase() === nomeDigitado.toLowerCase());
-                if (clienteEncontrado) {
-                    clienteId = clienteEncontrado.id;
-                }
-            }
+            const usarCredito = document.getElementById('checkUsarCredito').checked;
 
             if (formaPagamento === 'crediario' && !clienteId) {
                 mostrarAlerta('É obrigatório selecionar um cliente cadastrado da lista para registrar vendas no crediário!');
@@ -828,21 +1156,30 @@
                 usuario_id: usuarioLogado.id,
                 cliente_id: clienteId ? Number(clienteId) : null,
                 forma_pagamento: formaPagamento,
+                usar_credito: usarCredito,
                 itens: carrinho.map(i => ({
                     produto_id: i.produto_id,
                     nome: i.nome,
                     quantidade: i.quantidade,
-                    preco_unitario: i.preco_unitario
+                    preco_unitario: Number(i.preco_unitario.toFixed(2))
                 }))
             };
 
             if (formaPagamento === 'crediario') {
+                const qtdParcelas = parseInt(document.getElementById('credQtdParcelas').value) || 1;
+                let datasCustomizadas = [];
+                for (let i = 1; i <= qtdParcelas; i++) {
+                    const inputData = document.getElementById(`data_parcela_${i}`);
+                    if (inputData && inputData.value) datasCustomizadas.push(inputData.value);
+                }
+
                 dadosVenda.crediario = {
-                    valor_entrada: parseFloat(document.getElementById('credValorEntrada').value) || 0,
-                    qtd_parcelas: parseInt(document.getElementById('credQtdParcelas').value) || 1,
+                    valor_entrada: converterMoedaParaFloat(document.getElementById('credValorEntrada').value),
+                    qtd_parcelas: qtdParcelas,
                     tipo_juros: document.getElementById('credTipoJuros').value,
                     taxa_juros: parseFloat(document.getElementById('credTaxaJuros')?.value) || 0,
-                    data_vencimento: document.getElementById('credDataVencimento').value || null
+                    data_vencimento: document.getElementById('credDataVencimento').value || null,
+                    datas_customizadas: datasCustomizadas
                 };
             }
 
@@ -850,23 +1187,26 @@
             try {
                 const res = await fetch(`${API_URL}/vendas`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify(dadosVenda)
                 });
 
                 const data = await res.json();
                 if (res.ok) {
-                    mostrarAlerta('Venda realizada com sucesso!');
                     carrinho = [];
                     await carregarDadosIniciais();
                     atualizarCarrinho();
                     atualizarVisibilidadeCrediario();
                     document.getElementById('buscaCliente').value = '';
                     document.getElementById('cliente_id_selecionado').value = '';
-                    document.getElementById('buscaProduto').focus();
+                    document.getElementById('blocoAvisoCredito').style.display = 'none';
+                    clienteSelecionadoObjeto = null;
+
+                    if (data.comprovante) {
+                        abrirModalComprovante(data.comprovante);
+                    } else {
+                        mostrarAlerta('Venda realizada com sucesso!');
+                    }
                 } else {
                     mostrarAlerta(data.error || data.erro || 'Erro ao finalizar venda.');
                 }
@@ -878,56 +1218,194 @@
             }
         }
 
+        // --- GESTÃO DO MODAL DE COMPROVANTE & WHATSAPP ---
+        let dadosComprovanteAtual = null;
+        let tipoComprovanteAtual = 'venda'; // 'venda' ou 'compra'
+
+        function abrirModalComprovante(comp) {
+            dadosComprovanteAtual = comp;
+            tipoComprovanteAtual = 'venda';
+            document.getElementById('tituloModalComprovante').innerText = '🧾 Venda Finalizada com Sucesso!';
+            const conteudoEl = document.getElementById('conteudoComprovanteTexto');
+
+            let htmlItens = comp.itens.map(i => `• ${i.quantidade}x ${i.nome} - ${formatarMoeda(i.subtotal)}`).join('\n');
+
+            let detalhesPagamento = `Forma de Pagamento: ${comp.forma_pagamento.toUpperCase()}`;
+            if (comp.desconto_credito > 0) {
+                detalhesPagamento += `\nAbatido por Crédito em Haver: ${formatarMoeda(comp.desconto_credito)}`;
+            }
+
+            if (comp.forma_pagamento === 'crediario' && comp.crediario) {
+                const cred = comp.crediario;
+                detalhesPagamento += `\nEntrada: ${formatarMoeda(cred.valor_entrada)}`;
+                detalhesPagamento += `\nValor Financiado: ${formatarMoeda(cred.valor_financiado)}`;
+                if (cred.tipo_juros === 'com_juros' && cred.taxa_juros > 0) {
+                    detalhesPagamento += `\nTaxa de Juros: ${cred.taxa_juros}% a.m.`;
+                }
+                detalhesPagamento += `\n\nCronograma de Parcelas:`;
+                cred.parcelas.forEach(p => {
+                    detalhesPagamento += `\n- Parcela ${p.numero}/${p.total}: ${formatarMoeda(p.valor)} (Venc: ${p.vencimento.split('-').reverse().join('/')})`;
+                });
+            }
+
+            let textoCompleto = `🧾 *COMPROVANTE DE VENDA #${comp.venda_id}*\n`;
+            textoCompleto += `Data: ${comp.data}\n`;
+            textoCompleto += `Cliente: ${comp.cliente}\n\n`;
+            textoCompleto += `*Itens da Compra:*\n${htmlItens}\n\n`;
+            textoCompleto += `-----------------------------------\n`;
+            textoCompleto += `${detalhesPagamento}\n`;
+            textoCompleto += `-----------------------------------\n`;
+            textoCompleto += `*VALOR TOTAL: ${formatarMoeda(comp.itens.reduce((a, b) => a + b.subtotal, 0) - (comp.desconto_credito || 0))}*`;
+
+            conteudoEl.innerText = textoCompleto;
+
+            const divInputWap = document.getElementById('divInputWhatsappAvulso');
+            const inputWap = document.getElementById('inputWhatsappAvulso');
+            if (!comp.telefone) {
+                divInputWap.style.display = 'block';
+                inputWap.value = '';
+                setTimeout(() => inputWap.focus(), 100);
+            } else {
+                divInputWap.style.display = 'none';
+            }
+
+            document.getElementById('modalComprovante').style.display = 'flex';
+        }
+
+        function abrirModalComprovanteCompra(comp) {
+            dadosComprovanteAtual = comp;
+            tipoComprovanteAtual = 'compra';
+            document.getElementById('tituloModalComprovante').innerText = '🛍️ Recibo de Aquisição de Peças!';
+            const conteudoEl = document.getElementById('conteudoComprovanteTexto');
+
+            let htmlItens = comp.itens.map(i => `• ${i.quantidade}x ${i.nome} (Pago: ${formatarMoeda(i.subtotal)})`).join('\n');
+
+            let textoCompleto = `🛍️ *RECIBO DE AQUISIÇÃO DE PEÇAS*\n`;
+            textoCompleto += `Data: ${comp.data}\n`;
+            textoCompleto += `Fornecedor / Cliente: ${comp.cliente}\n`;
+            textoCompleto += `Forma de Acerto: ${comp.forma_pagamento.toUpperCase()}\n\n`;
+            textoCompleto += `*Itens Adquiridos / Lotes:*\n${htmlItens}\n\n`;
+            textoCompleto += `-----------------------------------\n`;
+            textoCompleto += `*VALOR TOTAL PAGO: ${formatarMoeda(comp.valor_total)}*`;
+
+            conteudoEl.innerText = textoCompleto;
+
+            const divInputWap = document.getElementById('divInputWhatsappAvulso');
+            const inputWap = document.getElementById('inputWhatsappAvulso');
+            if (!comp.telefone) {
+                divInputWap.style.display = 'block';
+                inputWap.value = '';
+                setTimeout(() => inputWap.focus(), 100);
+            } else {
+                divInputWap.style.display = 'none';
+            }
+
+            document.getElementById('modalComprovante').style.display = 'flex';
+        }
+
+        function fecharModalComprovante() {
+            document.getElementById('modalComprovante').style.display = 'none';
+            document.getElementById('buscaProduto').focus();
+        }
+
+        function enviarComprovanteWhatsApp() {
+            if (!dadosComprovanteAtual) return;
+            
+            let telefone = dadosComprovanteAtual.telefone ? dadosComprovanteAtual.telefone.replace(/\D/g, '') : '';
+
+            if (!telefone) {
+                const inputWap = document.getElementById('inputWhatsappAvulso');
+                telefone = inputWap ? inputWap.value.replace(/\D/g, '') : '';
+            }
+
+            if (!telefone) {
+                mostrarAlerta('Por favor, informe o número de WhatsApp para enviar o recibo.');
+                return;
+            }
+
+            const texto = document.getElementById('conteudoComprovanteTexto').innerText;
+            const urlWap = `https://api.whatsapp.com/send?phone=${telefone}&text=${encodeURIComponent(texto)}`;
+            window.open(urlWap, '_blank');
+        }
+
+        // Atalhos Globais de Teclado
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'F10') {
+                e.preventDefault();
+                finalizarVenda();
+            } else if (e.key === 'F2') {
+                e.preventDefault();
+                document.getElementById('buscaProduto').focus();
+            } else if (e.key === 'F4') {
+                e.preventDefault();
+                document.getElementById('buscaCliente').focus();
+            } else if (e.key === 'F6') {
+                e.preventDefault();
+                abrirModalAvulso();
+            } else if (e.key === 'F8') {
+                e.preventDefault();
+                abrirModalCompraPecas();
+            } else if (e.key === 'Escape') {
+                fecharModalAlertaCustomizado();
+                fecharModalAvulso();
+                fecharModalCompraPecas();
+                fecharModalComprovante();
+            }
+        });
+
         function sair() {
             localStorage.removeItem('token');
             localStorage.removeItem('usuario');
             window.location.href = 'login.html';
         }
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'F10') {
-                e.preventDefault();
-                finalizarVenda();
-            }
-        });
-
         function mostrarAlerta(mensagem) {
             const modal = document.getElementById('modalAlerta');
             document.getElementById('textoAlertaCustomizado').innerText = mensagem;
             modal.style.display = 'flex';
-
-            setTimeout(() => {
-                const btnOk = modal.querySelector('button');
-                if (btnOk) {
-                    btnOk.focus();
-                    const lidarComEnter = (e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            btnOk.click();
-                            document.removeEventListener('keydown', lidarComEnter, true);
-                        }
-                    };
-                    document.addEventListener('keydown', lidarComEnter, true);
-                }
-            }, 50);
         }
 
-        function fecharAlertaCustomizado() {
-            document.getElementById('modalAlerta').style.display = 'none';
-        }
+        function fecharModalAlertaCustomizado() { document.getElementById('modalAlerta').style.display = 'none'; }
     </script>
-    
-    <!-- Modal de Alerta Customizado -->
+
+    <!-- Modal de Alerta -->
     <div id="modalAlerta"
-        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2500; justify-content: center; align-items: center;">
         <div
             style="background: white; padding: 25px; border-radius: 8px; width: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); text-align: center;">
             <h3 style="color: #1e3a8a; margin-bottom: 10px;">Atenção</h3>
             <p id="textoAlertaCustomizado"
                 style="color: #475569; margin-bottom: 20px; font-size: 1rem; line-height: 1.4;"></p>
-            <button type="button" onclick="fecharAlertaCustomizado()"
+            <button type="button" onclick="fecharModalAlertaCustomizado()"
                 style="background-color: #2563eb; padding: 8px 20px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">OK</button>
+        </div>
+    </div>
+
+    <!-- Modal de Comprovante / Envio WhatsApp -->
+    <div id="modalComprovante"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2500; justify-content: center; align-items: center;">
+        <div
+            style="background: white; padding: 25px; border-radius: 8px; width: 450px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+            <h3 id="tituloModalComprovante" style="color: #1e3a8a; margin-bottom: 15px; text-align: center;">🧾 Venda Finalizada com Sucesso!</h3>
+            
+            <div id="conteudoComprovanteTexto"
+                style="background: #f8fafc; border: 1px dashed #cbd5e1; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; overflow-y: auto; max-height: 280px; color: #334155; margin-bottom: 12px;">
+            </div>
+
+            <!-- Campo integrado para WhatsApp de cliente avulso -->
+            <div id="divInputWhatsappAvulso" style="margin-bottom: 15px; display: none;">
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 4px;">WhatsApp do Cliente (com DDD):</label>
+                <input type="text" id="inputWhatsappAvulso" placeholder="Ex: 47999999999" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="button" onclick="enviarComprovanteWhatsApp()"
+                    style="flex: 1; background-color: #25d366; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9rem;">📲
+                    Enviar WhatsApp</button>
+                <button type="button" onclick="fecharModalComprovante()"
+                    style="flex: 1; background-color: #64748b; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9rem;">Fechar
+                    (Continuar)</button>
+            </div>
         </div>
     </div>
 </body>

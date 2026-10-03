@@ -78,42 +78,69 @@ app.post('/produtos', async (req, res) => {
     }
 });
 
-// 3. Rota Única e Segura para Registrar Venda (PDV) com Geração de Parcelas na Nova Tabela
+// 3. Rota para Registrar Venda com Abatimento de Crédito em Haver
 app.post('/vendas', async (req, res) => {
-    const { sessao_caixa_id, cliente_id, forma_pagamento, itens, crediario } = req.body;
+    const { sessao_caixa_id, cliente_id, forma_pagamento, itens, crediario, usar_credito } = req.body;
     const usuario_id = req.usuario.id;
     const erros = validarItensVenda(itens);
     if (!ehInteiroPositivo(sessao_caixa_id)) erros.push('Caixa inválido.');
     if (!['dinheiro', 'cartao_credito', 'cartao_debito', 'pix', 'crediario'].includes(forma_pagamento)) erros.push('Forma de pagamento inválida.');
-    if (cliente_id != null && !ehInteiroPositivo(cliente_id)) erros.push('Cliente inválido.');
+    if (cliente_id != null && cliente_id !== '' && !ehInteiroPositivo(cliente_id)) erros.push('Cliente inválido.');
     if (forma_pagamento === 'crediario' && !cliente_id) erros.push('Selecione um cliente para o crediário.');
     if (erros.length) return res.status(400).json({ erro: erros.join(' ') });
+
     let connection;
     let transacao = false;
     const recusar = mensagem => { const erro = new Error(mensagem); erro.status = 400; throw erro; };
+
     try {
         connection = await db.getConnection();
         await connection.beginTransaction();
         transacao = true;
+
         const [sessoes] = await connection.query("SELECT id FROM sessoes_caixa WHERE id = ? AND status = 'aberto' FOR UPDATE", [sessao_caixa_id]);
         if (!sessoes.length) recusar('O caixa está fechado. Abra um caixa antes de vender.');
-        const totalCentavos = itens.reduce((total, item) => total + Math.round(Number(item.preco_unitario) * 100) * Number(item.quantidade), 0);
+
+        let totalCentavos = itens.reduce((total, item) => {
+            const precoCentavos = Math.round(Number(item.preco_unitario) * 100);
+            return total + (precoCentavos * Number(item.quantidade));
+        }, 0);
+
         if (!Number.isSafeInteger(totalCentavos) || totalCentavos <= 0) recusar('Total da venda inválido.');
-        const valor_total = totalCentavos / 100;
-        if (cliente_id) {
-            const [clientes] = await connection.query('SELECT limite_credito FROM clientes WHERE id = ? FOR UPDATE', [cliente_id]);
+
+        let descontoCreditoCentavos = 0;
+        let nomeClienteStr = 'Cliente Avulso';
+        let telefoneClienteStr = '';
+        let clienteIdReal = cliente_id ? Number(cliente_id) : null;
+
+        if (clienteIdReal) {
+            const [clientes] = await connection.query('SELECT nome, telefone, limite_credito, saldo_credito FROM clientes WHERE id = ? FOR UPDATE', [clienteIdReal]);
             if (!clientes.length) recusar('Cliente não encontrado.');
+            const clienteRegistro = clientes[0];
+            nomeClienteStr = clienteRegistro.nome;
+            telefoneClienteStr = clienteRegistro.telefone || '';
+
+            if (usar_credito && Number(clienteRegistro.saldo_credito) > 0) {
+                const saldoClienteCentavos = Math.round(Number(clienteRegistro.saldo_credito) * 100);
+                descontoCreditoCentavos = Math.min(totalCentavos, saldoClienteCentavos);
+                totalCentavos -= descontoCreditoCentavos;
+            }
+
             if (forma_pagamento === 'crediario') {
-                const [dividas] = await connection.query("SELECT COALESCE(SUM(valor_total), 0) AS total_devido FROM vendas WHERE cliente_id = ? AND forma_pagamento = 'crediario'", [cliente_id]);
-                const disponivel = Math.round(Number(clientes[0].limite_credito) * 100) - Math.round(Number(dividas[0].total_devido) * 100);
+                const [dividas] = await connection.query("SELECT COALESCE(SUM(saldo_restante), 0) AS total_devido FROM parcelas_venda WHERE cliente_id = ? AND status != 'pago'", [clienteIdReal]);
+                const disponivel = Math.round(Number(clienteRegistro.limite_credito) * 100) - Math.round(Number(dividas[0].total_devido) * 100);
                 if (totalCentavos > disponivel) recusar(`Limite insuficiente! Disponível: R$ ${(disponivel / 100).toFixed(2)}.`);
             }
+        } else if (usar_credito) {
+            recusar('É necessário selecionar um cliente para utilizar o crédito em haver.');
         }
-        
+
+        const valor_total = totalCentavos / 100;
         let qtdParcelas = 1;
         let dataVencimento = null;
         let valorFinalVenda = valor_total;
         let dadosParcelasParaInserir = [];
+        let infoCrediarioRetorno = null;
 
         if (forma_pagamento === 'crediario' && crediario) {
             qtdParcelas = parseInt(crediario.qtd_parcelas) || 1;
@@ -125,9 +152,10 @@ app.post('/vendas', async (req, res) => {
 
             let totalComJurosCentavos = totalCentavos;
             let valorParcelaCentavos = 0;
+            let taxaJurosMes = Number(crediario.taxa_juros) || 0;
 
-            if (crediario.tipo_juros === 'com_juros' && crediario.taxa_juros > 0 && valorFinanciado > 0) {
-                const i = Number(crediario.taxa_juros) / 100;
+            if (crediario.tipo_juros === 'com_juros' && taxaJurosMes > 0 && valorFinanciado > 0) {
+                const i = taxaJurosMes / 100;
                 const n = qtdParcelas;
                 const p = valorFinanciado * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
                 valorParcelaCentavos = Math.round(p);
@@ -157,35 +185,47 @@ app.post('/vendas', async (req, res) => {
                 dadosParcelasParaInserir.push({
                     numero: i,
                     total: qtdParcelas,
-                    valor: valorParcelaCentavos / 100,
+                    valor: Number((valorParcelaCentavos / 100).toFixed(2)),
                     vencimento: dataFmtSql
                 });
             }
-        } else {
-            dadosParcelasParaInserir.push({
-                numero: 1,
-                total: 1,
-                valor: valor_total,
-                vencimento: new Date().toISOString().split('T')[0]
-            });
+
+            infoCrediarioRetorno = {
+                valor_entrada: entrada,
+                valor_financiado: valorFinanciado / 100,
+                tipo_juros: crediario.tipo_juros,
+                taxa_juros: taxaJurosMes,
+                parcelas: dadosParcelasParaInserir
+            };
         }
 
         const [venda] = await connection.query(
-            'INSERT INTO vendas (sessao_caixa_id, usuario_id, cliente_id, valor_total, forma_pagamento, qtd_parcelas, data_vencimento, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())', 
-            [sessao_caixa_id, usuario_id, cliente_id || null, valorFinalVenda, forma_pagamento, qtdParcelas, dataVencimento]
+            'INSERT INTO vendas (sessao_caixa_id, usuario_id, cliente_id, valor_total, forma_pagamento, qtd_parcelas, data_vencimento, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+            [sessao_caixa_id, usuario_id, clienteIdReal, Number(valorFinalVenda.toFixed(2)), forma_pagamento, qtdParcelas, dataVencimento]
         );
 
         const vendaIdInserida = venda.insertId;
 
-        for (const p of dadosParcelasParaInserir) {
+        if (descontoCreditoCentavos > 0 && clienteIdReal) {
             await connection.query(
-                'INSERT INTO parcelas_venda (venda_id, cliente_id, numero_parcela, total_parcelas, valor_parcela, data_vencimento, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [vendaIdInserida, cliente_id || null, p.numero, p.total, p.valor, p.vencimento, 'pendente']
+                'UPDATE clientes SET saldo_credito = saldo_credito - ? WHERE id = ?',
+                [descontoCreditoCentavos / 100, clienteIdReal]
             );
         }
 
+        if (forma_pagamento === 'crediario') {
+            for (const p of dadosParcelasParaInserir) {
+                await connection.query(
+                    'INSERT INTO parcelas_venda (venda_id, cliente_id, numero_parcela, total_parcelas, valor_parcela, valor_pago, saldo_restante, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 0.00, ?, ?, ?)',
+                    [vendaIdInserida, clienteIdReal, p.numero, p.total, p.valor, p.valor, p.vencimento, 'pendente']
+                );
+            }
+        }
+
+        let itensProcessadosParaComprovante = [];
         for (const item of [...itens].sort((a, b) => Number(a.produto_id || 0) - Number(b.produto_id || 0))) {
             let nome = item.nome || 'Item Avulso';
+            const precoUnitNum = Number(item.preco_unitario);
             if (item.produto_id) {
                 const [produtos] = await connection.query('SELECT estoque_atual, nome FROM produtos WHERE id = ? FOR UPDATE', [item.produto_id]);
                 if (!produtos.length) recusar('Produto não encontrado.');
@@ -193,11 +233,34 @@ app.post('/vendas', async (req, res) => {
                 nome = produtos[0].nome;
                 await connection.query('UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?', [item.quantidade, item.produto_id]);
             }
-            await connection.query('INSERT INTO itens_venda (venda_id, produto_id, quantidade, preco_unitario, nome_produto_avulso) VALUES (?, ?, ?, ?, ?)', [vendaIdInserida, item.produto_id || null, item.quantidade, Math.round(Number(item.preco_unitario) * 100) / 100, nome]);
+            await connection.query('INSERT INTO itens_venda (venda_id, produto_id, quantidade, preco_unitario, nome_produto_avulso) VALUES (?, ?, ?, ?, ?)', [vendaIdInserida, item.produto_id || null, item.quantidade, Number(precoUnitNum.toFixed(2)), nome]);
+
+            itensProcessadosParaComprovante.push({
+                nome: nome,
+                quantidade: item.quantidade,
+                preco_unitario: precoUnitNum,
+                subtotal: item.quantidade * precoUnitNum
+            });
         }
+
         await connection.commit();
         transacao = false;
-        res.status(201).json({ mensagem: 'Venda realizada com sucesso!', venda_id: vendaIdInserida, valor_total: valorFinalVenda });
+
+        res.status(201).json({
+            mensagem: 'Venda realizada com sucesso!',
+            venda_id: vendaIdInserida,
+            valor_total: Number(valorFinalVenda.toFixed(2)),
+            comprovante: {
+                venda_id: vendaIdInserida,
+                data: new Date().toLocaleString('pt-BR'),
+                cliente: nomeClienteStr,
+                telefone: telefoneClienteStr,
+                forma_pagamento: forma_pagamento,
+                itens: itensProcessadosParaComprovante,
+                desconto_credito: descontoCreditoCentavos / 100,
+                crediario: infoCrediarioRetorno
+            }
+        });
     } catch (error) {
         if (transacao) {
             try { await connection.rollback(); } catch (rollbackError) { console.error('Erro no rollback:', rollbackError); }
@@ -209,7 +272,7 @@ app.post('/vendas', async (req, res) => {
     }
 });
 
-// 4. Rota para Listar Vendas (para relatórios)
+// 4. Rota para Listar Vendas
 app.get('/vendas', async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -221,23 +284,20 @@ app.get('/vendas', async (req, res) => {
             LEFT JOIN clientes c ON v.cliente_id = c.id 
             ORDER BY v.id DESC
         `);
-       const [totalResult] = await db.query('SELECT SUM(valor_total) as total FROM vendas');
-       const totalGeral = totalResult[0]?.total || 0;
+        const [totalResult] = await db.query('SELECT SUM(valor_total) as total FROM vendas');
+        const totalGeral = Number(totalResult[0]?.total || 0).toFixed(2);
 
-       res.json({ vendas: rows, totalGeral });
-   } catch (error) {
-       console.error('Erro ao buscar vendas:', error);
-       res.status(500).json({ erro: 'Erro ao buscar vendas.' });
-   }
+        res.json({ vendas: rows, totalGeral });
+    } catch (error) {
+        console.error('Erro ao buscar vendas:', error);
+        res.status(500).json({ erro: 'Erro ao buscar vendas.' });
+    }
 });
 
-// Verificar se há caixa aberto
 app.get('/sessoes/ativa', async (req, res) => {
     try {
         const [rows] = await db.query("SELECT * FROM sessoes_caixa WHERE status = 'aberto' ORDER BY id DESC LIMIT 1");
-        if (rows.length === 0) {
-            return res.json({ aberta: false });
-        }
+        if (rows.length === 0) return res.json({ aberta: false });
         res.json({ aberta: true, sessao: rows[0] });
     } catch (error) {
         console.error('Erro ao verificar caixa:', error);
@@ -245,7 +305,6 @@ app.get('/sessoes/ativa', async (req, res) => {
     }
 });
 
-// Abrir novo caixa
 app.post('/sessoes/abrir', async (req, res) => {
     const usuario_id = req.usuario.id;
     const { valor_abertura } = req.body;
@@ -259,7 +318,7 @@ app.post('/sessoes/abrir', async (req, res) => {
         if (!bloqueado) return res.status(409).json({ error: 'Outra abertura em andamento. Aguarde.' });
         const [rows] = await connection.query("SELECT id FROM sessoes_caixa WHERE status = 'aberto'");
         if (rows.length) return res.status(409).json({ error: 'Ja existe um caixa aberto.' });
-        const [result] = await connection.query("INSERT INTO sessoes_caixa (usuario_id, valor_abertura, status, data_abertura) VALUES (?, ?, 'aberto', NOW())", [usuario_id, valor_abertura]);
+        const [result] = await connection.query("INSERT INTO sessoes_caixa (usuario_id, valor_abertura, status, data_abertura) VALUES (?, ?, 'aberto', NOW())", [usuario_id, Number(valor_abertura)]);
         res.json({ success: true, sessao_id: result.insertId });
     } catch (error) {
         console.error('Erro ao abrir caixa:', error);
@@ -272,7 +331,6 @@ app.post('/sessoes/abrir', async (req, res) => {
     }
 });
 
-// Fechar caixa
 app.post('/sessoes/fechar/:id', async (req, res) => {
     const { id } = req.params;
     const { valor_fechamento } = req.body;
@@ -280,7 +338,7 @@ app.post('/sessoes/fechar/:id', async (req, res) => {
     try {
         const [result] = await db.query(
             "UPDATE sessoes_caixa SET valor_fechamento = ?, status = 'fechado', data_fechamento = NOW() WHERE id = ? AND status = 'aberto'",
-            [valor_fechamento, id]
+            [Number(valor_fechamento), id]
         );
         if (!result.affectedRows) return res.status(409).json({ error: 'Caixa inexistente ou já fechado.' });
         res.json({ success: true });
@@ -290,26 +348,36 @@ app.post('/sessoes/fechar/:id', async (req, res) => {
     }
 });
 
-// Listar todos os clientes com débito calculado
 app.get('/api/clientes', async (req, res) => {
     try {
-        const query = `
-            SELECT c.*, 
-            COALESCE(SUM(CASE WHEN v.forma_pagamento = 'crediario' THEN v.valor_total ELSE 0 END), 0) as total_devido
-            FROM clientes c
-            LEFT JOIN vendas v ON c.id = v.cliente_id
-            GROUP BY c.id
-            ORDER BY c.nome ASC
-        `;
-        const [results] = await db.query(query);
-        res.json(results);
+        const [clientes] = await db.query('SELECT * FROM clientes ORDER BY nome ASC');
+
+        const [debitos] = await db.query(`
+            SELECT cliente_id, SUM(saldo_restante) as total_devido 
+            FROM parcelas_venda 
+            WHERE status != 'pago' AND cliente_id IS NOT NULL 
+            GROUP BY cliente_id
+        `);
+
+        const mapaDebitos = {};
+        debitos.forEach(d => {
+            mapaDebitos[d.cliente_id] = Number(d.total_devido || 0);
+        });
+
+        const resultadoFinal = clientes.map(c => ({
+            ...c,
+            total_devido: mapaDebitos[c.id] || 0,
+            saldo_credito: Number(c.saldo_credito || 0),
+            origem_saldo_credito: Number(c.saldo_credito || 0) > 0 ? 'Crédito referente a aquisição de roupas/peças' : 'Nenhum'
+        }));
+
+        res.json(resultadoFinal);
     } catch (err) {
         console.error('Erro ao buscar clientes:', err);
         res.status(500).json({ erro: 'Erro ao buscar clientes' });
     }
 });
 
-// Cadastrar novo cliente (com endereço completo)
 app.post('/api/clientes', async (req, res) => {
     try {
         const { nome, telefone, limite_credito, cep, logradouro, numero, bairro, cidade, estado, complemento } = req.body;
@@ -323,11 +391,11 @@ app.post('/api/clientes', async (req, res) => {
             return res.status(400).json({ erro: 'O limite de crédito deve ser um valor válido.' });
         }
         const query = `
-            INSERT INTO clientes (nome, telefone, limite_credito, cep, logradouro, numero, bairro, cidade, estado, complemento) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO clientes (nome, telefone, limite_credito, saldo_credito, cep, logradouro, numero, bairro, cidade, estado, complemento) 
+            VALUES (?, ?, ?, 0.00, ?, ?, ?, ?, ?, ?, ?)
         `;
         const [result] = await db.query(query, [
-            nome.trim(), telefone || '', limite_credito || 0.00, 
+            nome.trim(), telefone || '', Number(limite_credito || 0).toFixed(2),
             cep || '', logradouro || '', numero || '', bairro || '', cidade || '', estado || '', complemento || ''
         ]);
         res.json({ id: result.insertId, mensagem: 'Cliente cadastrado com sucesso!' });
@@ -337,7 +405,6 @@ app.post('/api/clientes', async (req, res) => {
     }
 });
 
-// Atualizar cliente existente (Edição)
 app.put('/api/clientes/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -352,7 +419,7 @@ app.put('/api/clientes/:id', async (req, res) => {
             WHERE id = ?
         `;
         const [result] = await db.query(query, [
-            nome.trim(), telefone || '', limite_credito || 0.00, 
+            nome.trim(), telefone || '', Number(limite_credito || 0).toFixed(2),
             cep || '', logradouro || '', numero || '', bairro || '', cidade || '', estado || '', complemento || '', id
         ]);
         if (result.affectedRows === 0) return res.status(404).json({ erro: 'Cliente não encontrado.' });
@@ -363,7 +430,6 @@ app.put('/api/clientes/:id', async (req, res) => {
     }
 });
 
-// Buscar crediários e parcelas de um cliente específico buscando da tabela parcelas_venda
 app.get('/api/clientes/:id/crediarios', async (req, res) => {
     try {
         const clienteId = req.params.id;
@@ -377,9 +443,12 @@ app.get('/api/clientes/:id/crediarios', async (req, res) => {
                    (
                        SELECT JSON_ARRAYAGG(
                            JSON_OBJECT(
+                               'id', pv.id,
                                'numero', pv.numero_parcela,
                                'totalParcelas', pv.total_parcelas,
-                               'valor', pv.valor_parcela,
+                               'valor', ROUND(pv.valor_parcela, 2),
+                               'valor_pago', ROUND(COALESCE(pv.valor_pago, 0.00), 2),
+                               'saldo_restante', ROUND(COALESCE(pv.saldo_restante, pv.valor_parcela), 2),
                                'vencimento', DATE_FORMAT(pv.data_vencimento, '%d/%m/%Y'),
                                'status', pv.status
                            )
@@ -394,9 +463,10 @@ app.get('/api/clientes/:id/crediarios', async (req, res) => {
             ORDER BY v.criado_em DESC
         `;
         const [results] = await db.query(query, [clienteId]);
-        
+
         const formatados = results.map(row => ({
             ...row,
+            valor_total: Number(row.valor_total).toFixed(2),
             parcelas: typeof row.parcelas_json === 'string' ? JSON.parse(row.parcelas_json) : (row.parcelas_json || [])
         }));
 
@@ -407,7 +477,142 @@ app.get('/api/clientes/:id/crediarios', async (req, res) => {
     }
 });
 
-// Relatório de Fechamento de Caixa
+app.post('/api/parcelas/:id/pagar', async (req, res) => {
+    const { id } = req.params;
+    const { valor_pagamento } = req.body;
+
+    const parcId = Number(id);
+    const valPag = Number(valor_pagamento);
+
+    if (!Number.isInteger(parcId) || parcId <= 0 || isNaN(valPag) || valPag <= 0) {
+        return res.status(400).json({ erro: 'ID da parcela ou valor de pagamento inválido.' });
+    }
+
+    let connection;
+    try {
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        const [parcelasAlvo] = await connection.query('SELECT * FROM parcelas_venda WHERE id = ? FOR UPDATE', [parcId]);
+        if (!parcelasAlvo.length) {
+            await connection.rollback();
+            return res.status(404).json({ erro: 'Parcela não encontrada.' });
+        }
+
+        const vendaId = parcelasAlvo[0].venda_id;
+        const clienteId = parcelasAlvo[0].cliente_id;
+
+        const [parcelasVenda] = await connection.query(
+            "SELECT * FROM parcelas_venda WHERE venda_id = ? AND status != 'pago' ORDER BY numero_parcela ASC FOR UPDATE",
+            [vendaId]
+        );
+
+        let dinheiroRestanteCentavos = Math.round(valPag * 100);
+        let parcelasAtualizadasCount = 0;
+
+        for (const parc of parcelasVenda) {
+            if (dinheiroRestanteCentavos <= 0) break;
+
+            let saldoParcCentavos = Math.round(Number(parc.saldo_restante || parc.valor_parcela) * 100);
+            const valorAplicarCentavos = Math.min(dinheiroRestanteCentavos, saldoParcCentavos);
+
+            const novoValorPagoCentavos = Math.round(Number(parc.valor_pago || 0) * 100) + valorAplicarCentavos;
+            const novoSaldoRestanteCentavos = Math.max(0, saldoParcCentavos - valorAplicarCentavos);
+            const novoStatus = novoSaldoRestanteCentavos === 0 ? 'pago' : 'parcial';
+
+            await connection.query(
+                'UPDATE parcelas_venda SET valor_pago = ?, saldo_restante = ?, status = ? WHERE id = ?',
+                [novoValorPagoCentavos / 100, novoSaldoRestanteCentavos / 100, novoStatus, parc.id]
+            );
+
+            dinheiroRestanteCentavos -= valorAplicarCentavos;
+            parcelasAtualizadasCount++;
+        }
+
+        let mensagemRetorno = `Pagamento processado com sucesso! ${parcelasAtualizadasCount} parcela(s) afetada(s).`;
+
+        if (dinheiroRestanteCentavos > 0 && clienteId) {
+            const creditoAdicional = dinheiroRestanteCentavos / 100;
+            if (creditoAdicional > 1000000) {
+                throw new Error('O valor excedente de crédito é excessivamente alto.');
+            }
+            await connection.query(
+                'UPDATE clientes SET saldo_credito = COALESCE(saldo_credito, 0) + ? WHERE id = ?',
+                [creditoAdicional, clienteId]
+            );
+            mensagemRetorno += ` O excedente de R$ ${creditoAdicional.toFixed(2)} foi adicionado como crédito em haver para o cliente!`;
+        }
+
+        await connection.commit();
+        res.json({
+            mensagem: mensagemRetorno,
+            parcelas_atualizadas: parcelasAtualizadasCount,
+            credito_gerado: dinheiroRestanteCentavos > 0 ? (dinheiroRestanteCentavos / 100) : 0
+        });
+
+    } catch (error) {
+        if (connection) {
+            try { await connection.rollback(); } catch (rbErr) { console.error('Erro no rollback:', rbErr); }
+        }
+        console.error('Erro ao registrar pagamento da parcela:', error);
+        res.status(500).json({ erro: error.message || 'Erro interno ao registrar o pagamento.' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+// Rota para listar o relatório consolidado de compras de peças / lotes (Brechó) com criação automática de tabelas
+app.get('/api/relatorios/compras-brecho', async (req, res) => {
+    let connection;
+    try {
+        connection = await db.getConnection();
+
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS compras_brecho (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sessao_caixa_id INT,
+                cliente_id INT,
+                nome_cliente_avulso VARCHAR(150),
+                valor_total DECIMAL(10,2),
+                forma_pagamento VARCHAR(50),
+                criado_em DATETIME
+            )
+        `);
+
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS itens_compra_brecho (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                compra_brecho_id INT,
+                nome_produto VARCHAR(150),
+                quantidade INT,
+                preco_custo DECIMAL(10,2)
+            )
+        `);
+
+        const [rows] = await connection.query(`
+            SELECT cb.id, cb.valor_total, cb.forma_pagamento,
+                   DATE_FORMAT(cb.criado_em, '%d/%m/%Y %H:%i') AS data,
+                   COALESCE(c.nome, cb.nome_cliente_avulso, 'Cliente Avulso') AS cliente_nome,
+                   COALESCE(
+                       NULLIF(GROUP_CONCAT(CONCAT(cp.quantidade, 'x ', cp.nome_produto) SEPARATOR ', '), ''), 
+                       'Lote de Roupas'
+                   ) as itens_descricao
+            FROM compras_brecho cb
+            LEFT JOIN clientes c ON cb.cliente_id = c.id
+            LEFT JOIN itens_compra_brecho cp ON cb.id = cp.compra_brecho_id
+            GROUP BY cb.id
+            ORDER BY cb.id DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        console.error('Erro ao gerar relatório de compras de brechó:', err);
+        res.status(500).json({ erro: 'Erro ao gerar relatório.' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+// Relatório de Conferência de Caixas atualizado com o abatimento das compras de brechó pagas em dinheiro/Pix
 app.get('/relatorios/caixas', async (req, res) => {
     try {
         const [sessoes] = await db.query(`
@@ -419,10 +624,10 @@ app.get('/relatorios/caixas', async (req, res) => {
                 s.status,
                 s.data_abertura,
                 s.data_fechamento,
-                COALESCE(SUM(v.valor_total), 0) as total_vendas
+                COALESCE((SELECT SUM(v.valor_total) FROM vendas v WHERE v.sessao_caixa_id = s.id), 0) as total_vendas,
+                COALESCE((SELECT SUM(cb.valor_total) FROM compras_brecho cb WHERE cb.sessao_caixa_id = s.id AND cb.forma_pagamento != 'credito_loja'), 0) as total_compras
             FROM sessoes_caixa s
             JOIN usuarios u ON s.usuario_id = u.id
-            LEFT JOIN vendas v ON v.sessao_caixa_id = s.id
             GROUP BY s.id
             ORDER BY s.id DESC
         `);
@@ -430,23 +635,29 @@ app.get('/relatorios/caixas', async (req, res) => {
         const resultado = sessoes.map(sessao => {
             const abertura = Number(sessao.valor_abertura) || 0;
             const vendas = Number(sessao.total_vendas) || 0;
-            const esperado = abertura + vendas;
-            const fechamento = sessao.valor_fechamento !== null ? Number(sessao.valor_fechamento) : null;
+            const compras = Number(sessao.total_compras) || 0;
             
+            const esperado = abertura + vendas - compras;
+            const fechamento = sessao.valor_fechamento !== null ? Number(sessao.valor_fechamento) : null;
+
             let diferenca = 0;
             let status_caixa = 'Aberto';
 
             if (sessao.status === 'fechado' && fechamento !== null) {
                 diferenca = fechamento - esperado;
                 if (diferenca > 0) status_caixa = `Sobra (R$ ${diferenca.toFixed(2)})`;
-                else if (diferenca < 0) status_caixa = `Falta (R$ ${Math.abs(diferenca).toFixed(2)})`; 
+                else if (diferenca < 0) status_caixa = `Falta (R$ ${Math.abs(diferenca).toFixed(2)})`;
                 else status_caixa = 'Bateu Certo';
             }
 
             return {
                 ...sessao,
-                valor_esperado: esperado,
-                diferenca,
+                valor_abertura: abertura.toFixed(2),
+                valor_fechamento: fechamento !== null ? fechamento.toFixed(2) : null,
+                total_vendas: vendas.toFixed(2),
+                total_compras: compras.toFixed(2),
+                valor_esperado: esperado.toFixed(2),
+                diferenca: diferenca.toFixed(2),
                 situacao_caixa: status_caixa
             };
         });
@@ -458,7 +669,6 @@ app.get('/relatorios/caixas', async (req, res) => {
     }
 });
 
-// Relatório de Produtos com Estoque Baixo
 app.get('/relatorios/estoque-baixo', async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -475,7 +685,6 @@ app.get('/relatorios/estoque-baixo', async (req, res) => {
     }
 });
 
-// Relatório de Ranking de Produtos Mais Vendidos
 app.get('/relatorios/mais-vendidos', async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -495,7 +704,6 @@ app.get('/relatorios/mais-vendidos', async (req, res) => {
     }
 });
 
-// Rota de Login
 app.post('/login', async (req, res) => {
     try {
         const { nome, email, senha } = req.body;
@@ -503,63 +711,36 @@ app.post('/login', async (req, res) => {
         if (typeof entrada !== 'string' || typeof senha !== 'string') return res.status(400).json({ error: 'Preencha os campos corretamente.' });
         const identificador = entrada.trim();
 
-        if (!identificador || !senha) {
-            return res.status(400).json({ error: 'Preencha todos os campos.' });
-        }
+        if (!identificador || !senha) return res.status(400).json({ error: 'Preencha todos os campos.' });
 
         const [rows] = await db.query(
             'SELECT * FROM usuarios WHERE LOWER(nome) = LOWER(?) OR LOWER(email) = LOWER(?)',
             [identificador, identificador]
         );
 
-        if (rows.length === 0 || !rows[0].ativo) {
-            return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
-        }
+        if (rows.length === 0 || !rows[0].ativo) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
 
         const usuario = rows[0];
         const senhaCorreta = await bcrypt.compare(senha, usuario.senha_hash);
-
-        if (!senhaCorreta) {
-            return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
-        }
+        if (!senhaCorreta) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
 
         const jwtSecret = process.env.JWT_SECRET;
-        if (!jwtSecret) {
-            console.error('JWT_SECRET não definido no arquivo .env');
-            return res.status(500).json({ error: 'Erro interno no servidor.' });
-        }
+        if (!jwtSecret) return res.status(500).json({ error: 'Erro interno no servidor.' });
 
-        const token = jwt.sign(
-            { id: usuario.id, cargo: usuario.cargo },
-            jwtSecret,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
-        );
+        const token = jwt.sign({ id: usuario.id, cargo: usuario.cargo }, jwtSecret, { expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
 
-        res.json({
-            token,
-            usuario: {
-                id: usuario.id,
-                nome: usuario.nome,
-                email: usuario.email,
-                cargo: usuario.cargo
-            }
-        });
-
+        res.json({ token, usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, cargo: usuario.cargo } });
     } catch (error) {
         console.error('Erro crítico no login:', error);
         res.status(500).json({ error: 'Erro interno no servidor.' });
     }
 });
 
-// Rota para Excluir Produto
 app.delete('/produtos/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const [result] = await db.query('DELETE FROM produtos WHERE id = ?', [id]);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ erro: 'Produto não encontrado.' });
-        }
+        if (result.affectedRows === 0) return res.status(404).json({ erro: 'Produto não encontrado.' });
         res.json({ mensagem: 'Produto excluído com sucesso!' });
     } catch (error) {
         console.error('Erro ao excluir produto:', error);
@@ -567,7 +748,6 @@ app.delete('/produtos/:id', async (req, res) => {
     }
 });
 
-// Rota para Atualizar Produto
 app.put('/produtos/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -577,12 +757,10 @@ app.put('/produtos/:id', async (req, res) => {
 
         const [result] = await db.query(
             `UPDATE produtos SET codigo_barras = ?, nome = ?, categoria_id = ?, preco_custo = ?, preco_venda = ?, estoque_atual = ? WHERE id = ?`,
-            [codigo_barras, nome, categoria_id || null, preco_custo, preco_venda, estoque_atual, id]
+            [codigo_barras, nome, categoria_id || null, Number(preco_custo), Number(preco_venda), Number(estoque_atual), id]
         );
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ erro: 'Produto não encontrado.' });
-        }
+        if (result.affectedRows === 0) return res.status(404).json({ erro: 'Produto não encontrado.' });
         res.json({ mensagem: 'Produto atualizado com sucesso!' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ erro: 'Código de barras já cadastrado.' });
@@ -591,7 +769,156 @@ app.put('/produtos/:id', async (req, res) => {
     }
 });
 
-// Iniciar Servidor
+// Rota para Registrar Compra de Peças / Lotes com Suporte a Nome Avulso, Comprovante e Gravação Consolidada
+app.post('/compras-brecho', async (req, res) => {
+    const { sessao_caixa_id, cliente_id, nome_cliente_avulso, forma_pagamento, itens } = req.body;
+
+    if (!ehInteiroPositivo(sessao_caixa_id)) return res.status(400).json({ erro: 'Caixa inválido.' });
+    if (!['dinheiro', 'pix', 'credito_loja'].includes(forma_pagamento)) return res.status(400).json({ erro: 'Forma de pagamento inválida.' });
+    if (!Array.isArray(itens) || itens.length === 0) return res.status(400).json({ erro: 'Nenhum item informado para compra.' });
+
+    let clienteIdReal = (cliente_id != null && cliente_id !== '') ? Number(cliente_id) : null;
+    if (forma_pagamento === 'credito_loja' && !clienteIdReal) {
+        return res.status(400).json({ erro: 'Para deixar em crédito em haver, é necessário selecionar um cliente cadastrado.' });
+    }
+
+    let connection;
+    let transacao = false;
+    const recusar = mensagem => { const erro = new Error(mensagem); erro.status = 400; throw erro; };
+
+    try {
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+        transacao = true;
+
+        const [sessoes] = await connection.query("SELECT id FROM sessoes_caixa WHERE id = ? AND status = 'aberto' FOR UPDATE", [sessao_caixa_id]);
+        if (!sessoes.length) recusar('O caixa está fechado. Abra um caixa antes de registrar compras.');
+
+        let nomeClienteStr = nome_cliente_avulso ? nome_cliente_avulso.trim() : 'Cliente Avulso';
+        let telefoneClienteStr = '';
+
+        if (clienteIdReal) {
+            const [clientes] = await connection.query('SELECT nome, telefone FROM clientes WHERE id = ? FOR UPDATE', [clienteIdReal]);
+            if (clientes.length) {
+                nomeClienteStr = clientes[0].nome;
+                telefoneClienteStr = clientes[0].telefone || '';
+            }
+        }
+
+        let totalCentavos = itens.reduce((total, item) => {
+            const precoCentavos = Math.round(Number(item.preco_custo) * 100);
+            return total + (precoCentavos * Number(item.quantidade));
+        }, 0);
+
+        if (!Number.isSafeInteger(totalCentavos) || totalCentavos <= 0) recusar('Valor total da compra inválido.');
+        const valorTotalReais = totalCentavos / 100;
+
+        if (forma_pagamento === 'credito_loja' && clienteIdReal) {
+            await connection.query(
+                'UPDATE clientes SET saldo_credito = COALESCE(saldo_credito, 0) + ? WHERE id = ?',
+                [valorTotalReais, clienteIdReal]
+            );
+        }
+
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS compras_brecho (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sessao_caixa_id INT,
+                cliente_id INT,
+                nome_cliente_avulso VARCHAR(150),
+                valor_total DECIMAL(10,2),
+                forma_pagamento VARCHAR(50),
+                criado_em DATETIME
+            )
+        `);
+
+        const [resCompra] = await connection.query(
+            `INSERT INTO compras_brecho (sessao_caixa_id, cliente_id, nome_cliente_avulso, valor_total, forma_pagamento, criado_em) 
+             VALUES (?, ?, ?, ?, ?, NOW())`,
+            [sessao_caixa_id, clienteIdReal, clienteIdReal ? null : nomeClienteStr, valorTotalReais, forma_pagamento]
+        );
+        const compraBrechoId = resCompra.insertId;
+
+        let itensProcessadosParaComprovante = [];
+        for (const item of itens) {
+            const nomeProduto = item.nome || 'Saco de Roupas / Lote';
+            const precoCusto = Number(item.preco_custo) || 0;
+            const precoVenda = Number(item.preco_venda) || (precoCusto * 2);
+            const qtd = Number(item.quantidade) || 1;
+            const codigoBarras = `COMPRA-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+            await connection.query(
+                `INSERT INTO produtos (codigo_barras, nome, preco_custo, preco_venda, estoque_atual, estoque_minimo) 
+                 VALUES (?, ?, ?, ?, ?, 1)`,
+                [codigoBarras, nomeProduto, precoCusto, precoVenda, qtd]
+            );
+
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS itens_compra_brecho (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    compra_brecho_id INT,
+                    nome_produto VARCHAR(150),
+                    quantidade INT,
+                    preco_custo DECIMAL(10,2)
+                )
+            `);
+
+            await connection.query(
+                `INSERT INTO itens_compra_brecho (compra_brecho_id, nome_produto, quantidade, preco_custo) VALUES (?, ?, ?, ?)`,
+                [compraBrechoId, nomeProduto, qtd, precoCusto]
+            );
+
+            itensProcessadosParaComprovante.push({
+                nome: nomeProduto,
+                quantidade: qtd,
+                subtotal: precoCusto * qtd
+            });
+        }
+
+        await connection.commit();
+        transacao = false;
+
+        res.status(201).json({
+            mensagem: 'Aquisição de lote registrada com sucesso e estoque atualizado!',
+            valor_total: valorTotalReais,
+            comprovante: {
+                data: new Date().toLocaleString('pt-BR'),
+                cliente: nomeClienteStr,
+                telefone: telefoneClienteStr,
+                forma_pagamento: forma_pagamento,
+                itens: itensProcessadosParaComprovante,
+                valor_total: valorTotalReais
+            }
+        });
+
+    } catch (error) {
+        if (transacao) {
+            try { await connection.rollback(); } catch (rbErr) { console.error('Erro no rollback:', rbErr); }
+        }
+        console.error('Erro ao registrar compra de lote:', error);
+        res.status(error.status || 500).json({ erro: error.message || 'Erro ao registrar a aquisição de lote.' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+// Rota para consultar o histórico de compras/lotes de roupas de um cliente específico
+app.get('/api/clientes/:id/compras-brecho', async (req, res) => {
+    try {
+        const clienteId = req.params.id;
+        const [rows] = await db.query(`
+            SELECT cb.id, cb.valor_total, cb.forma_pagamento,
+                   DATE_FORMAT(cb.criado_em, '%d/%m/%Y %H:%i') AS data
+            FROM compras_brecho cb
+            WHERE cb.cliente_id = ?
+            ORDER BY cb.id DESC
+        `, [clienteId]);
+        res.json(rows);
+    } catch (err) {
+        res.json([]);
+    }
+});
+
 if (require.main === module) {
     const config = require('./utils/configuracao').configuracao();
     app.listen(config.port, config.host, () => {
@@ -599,4 +926,5 @@ if (require.main === module) {
         console.log(`Servidor iniciado em ${config.host}:${config.port}`);
     });
 }
+
 module.exports = app;
